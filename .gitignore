@@ -21,7 +21,7 @@ backend/.venv/
 backend/.pytest_cache/
 
 # Python data (Datasets grandes não devem ir para o git)
-backend/data/*.csv
+#backend/data/*.csv
 backend/data/*.zip
 *.sqlite3
 
