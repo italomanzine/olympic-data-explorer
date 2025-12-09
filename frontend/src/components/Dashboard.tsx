@@ -287,7 +287,7 @@ export default function Dashboard() {
                 <span className="w-2 h-2 rounded-full bg-olympic-yellow"></span>
                 <span className="w-2 h-2 rounded-full bg-olympic-black"></span>
              </div>
-             <span className="font-bold text-lg tracking-tight ml-2">OlympicData</span>
+             <span className="font-bold text-lg tracking-tight ml-2">Olympic Data</span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400">
             <Menu className="w-5 h-5" />
@@ -414,7 +414,7 @@ export default function Dashboard() {
           <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-slate-600">
             <Menu className="w-6 h-6" />
           </button>
-          <span className="font-bold text-slate-800">OlympicData</span>
+          <span className="font-bold text-slate-800">Olympic Data</span>
           <div className="w-8"></div>
         </header>
 
