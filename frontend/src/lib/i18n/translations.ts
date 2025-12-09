@@ -69,6 +69,15 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_medals: "Medalhas do Atleta",
     expand: "Expandir",
     all_editions: "Todas as edições",
+    
+    // Novos filtros e gráfico de top atletas
+    top_athletes_title: "Top 10 Atletas Medalhistas",
+    all_years: "Todos os Anos",
+    medal_filter: "Medalha",
+    filter_total: "Total",
+    filter_gold: "Ouro",
+    filter_silver: "Prata",
+    filter_bronze: "Bronze",
   },
   'en': {
     app_title: "Olympic Dashboard",
@@ -125,6 +134,15 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_medals: "Athlete Medals",
     expand: "Expand",
     all_editions: "All editions",
+    
+    // New filters and top athletes chart
+    top_athletes_title: "Top 10 Medal Athletes",
+    all_years: "All Years",
+    medal_filter: "Medal",
+    filter_total: "Total",
+    filter_gold: "Gold",
+    filter_silver: "Silver",
+    filter_bronze: "Bronze",
   },
   'es': {
     app_title: "Tablero Olímpico",
@@ -181,6 +199,15 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_medals: "Medallas del Atleta",
     expand: "Expandir",
     all_editions: "Todas las ediciones",
+    
+    // Nuevos filtros y gráfico de top atletas
+    top_athletes_title: "Top 10 Atletas Medallistas",
+    all_years: "Todos los Años",
+    medal_filter: "Medalla",
+    filter_total: "Total",
+    filter_gold: "Oro",
+    filter_silver: "Plata",
+    filter_bronze: "Bronce",
   },
   'fr': {
     app_title: "Tableau de Bord Olympique",
@@ -237,6 +264,15 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_medals: "Médailles de l'Athlète",
     expand: "Agrandir",
     all_editions: "Toutes les éditions",
+    
+    // Nouveaux filtres et graphique des meilleurs athlètes
+    top_athletes_title: "Top 10 Athlètes Médaillés",
+    all_years: "Toutes les Années",
+    medal_filter: "Médaille",
+    filter_total: "Total",
+    filter_gold: "Or",
+    filter_silver: "Argent",
+    filter_bronze: "Bronze",
   },
   'zh': {
     app_title: "奥运仪表板",
@@ -293,6 +329,15 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_medals: "运动员奖牌",
     expand: "展开",
     all_editions: "所有版本",
+    
+    // 新筛选器和顶级运动员图表
+    top_athletes_title: "前10名奖牌运动员",
+    all_years: "所有年份",
+    medal_filter: "奖牌",
+    filter_total: "总计",
+    filter_gold: "金牌",
+    filter_silver: "银牌",
+    filter_bronze: "铜牌",
   }
 };
 

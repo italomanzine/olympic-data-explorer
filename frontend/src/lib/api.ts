@@ -1,13 +1,14 @@
 const API_BASE_URL = "http://localhost:8000/api";
 
 export interface FilterState {
-  year?: number;
+  year?: number | null;
   start_year?: number;
   end_year?: number;
   season?: string; 
   sex?: string;    
   sport?: string;
-  country?: string; 
+  country?: string;
+  medal_type?: string;
 }
 
 function buildParams(filters: FilterState) {
@@ -19,6 +20,7 @@ function buildParams(filters: FilterState) {
   if (filters.sex && filters.sex !== "Both") params.append("sex", filters.sex);
   if (filters.sport && filters.sport !== "All") params.append("sport", filters.sport);
   if (filters.country && filters.country !== "All") params.append("country", filters.country);
+  if (filters.medal_type && filters.medal_type !== "Total") params.append("medal_type", filters.medal_type);
   return params;
 }
 
@@ -73,6 +75,26 @@ export async function fetchMedalTable(filters: FilterState): Promise<MedalStat[]
   const params = buildParams(filters);
   const res = await fetch(`${API_BASE_URL}/stats/medals?${params}`);
   if (!res.ok) throw new Error("Failed to fetch medal table");
+  return res.json();
+}
+
+// ===== Top Athletes =====
+
+export interface TopAthlete {
+  id: number;
+  name: string;
+  noc: string;
+  gold: number;
+  silver: number;
+  bronze: number;
+  total: number;
+}
+
+export async function fetchTopAthletes(filters: FilterState, limit: number = 10): Promise<TopAthlete[]> {
+  const params = buildParams(filters);
+  params.append("limit", limit.toString());
+  const res = await fetch(`${API_BASE_URL}/stats/top-athletes?${params}`);
+  if (!res.ok) throw new Error("Failed to fetch top athletes");
   return res.json();
 }
 

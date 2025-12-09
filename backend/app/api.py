@@ -242,6 +242,69 @@ def get_medal_table(
     return result
 
 
+@router.get("/stats/top-athletes")
+def get_top_athletes(
+    year: Optional[int] = None,
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+    season: Optional[str] = None,
+    sex: Optional[str] = None,
+    country: Optional[str] = None,
+    sport: Optional[str] = None,
+    medal_type: Optional[str] = None,
+    limit: int = Query(10, ge=1, le=50)
+):
+    """Retorna os top atletas com mais medalhas"""
+    df = data_loader.get_df()
+    
+    filtered = apply_filters(df, year, season, sex, country, sport, start_year, end_year)
+    medals_only = filtered[filtered['Medal'] != 'No Medal']
+    
+    if medals_only.empty:
+        return []
+    
+    # Aplicar filtro de tipo de medalha se especificado
+    if medal_type and medal_type != "Total":
+        medals_only = medals_only[medals_only['Medal'] == medal_type]
+    
+    if medals_only.empty:
+        return []
+    
+    # Deduplicar por evento (uma medalha por evento para times)
+    medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'ID', 'Event', 'Medal'])
+    
+    # Agrupar por atleta
+    athlete_medals = medals_deduped.groupby(['ID', 'Name', 'NOC'])['Medal'].value_counts().unstack(fill_value=0)
+    
+    desired_cols = ['Gold', 'Silver', 'Bronze']
+    for col in desired_cols:
+        if col not in athlete_medals.columns:
+            athlete_medals[col] = 0
+    
+    athlete_medals['Total'] = athlete_medals[desired_cols].sum(axis=1)
+    
+    # Ordenar por total de medalhas (ou por tipo específico se filtrado)
+    sort_col = medal_type if medal_type and medal_type != "Total" else 'Total'
+    if sort_col not in athlete_medals.columns:
+        sort_col = 'Total'
+    
+    athlete_medals = athlete_medals.sort_values(by=sort_col, ascending=False).head(limit)
+    
+    result = []
+    for (athlete_id, name, noc), row in athlete_medals.iterrows():
+        result.append({
+            "id": int(athlete_id),
+            "name": name,
+            "noc": noc,
+            "gold": int(row.get('Gold', 0)),
+            "silver": int(row.get('Silver', 0)),
+            "bronze": int(row.get('Bronze', 0)),
+            "total": int(row['Total'])
+        })
+    
+    return result
+
+
 @router.get("/athletes/search")
 def search_athletes(
     query: str = Query(..., min_length=2, description="Nome do atleta para buscar"),

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useTransition } from "react";
-import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, FilterState, MedalStat, AthleteSearchResult, AthleteProfile, AthleteStats, fetchAthleteProfile, fetchAthleteStats } from "../lib/api";
+import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, fetchTopAthletes, FilterState, MedalStat, AthleteSearchResult, AthleteProfile, AthleteStats, TopAthlete, fetchAthleteProfile, fetchAthleteStats } from "../lib/api";
 import WorldMap from "./charts/WorldMap";
 import BiometricsChart from "./charts/BiometricsChart";
 import EvolutionChart from "./charts/EvolutionChart";
+import TopAthletesChart from "./charts/TopAthletesChart";
 import MedalTable from "./MedalTable"; 
 import RangeSlider from "./ui/RangeSlider";
 import SearchableSelect from "./ui/SearchableSelect";
@@ -64,7 +65,8 @@ export default function Dashboard() {
     sex: "Both",
     sport: "All",
     country: "All", 
-    year: 2016
+    year: 2016,
+    medal_type: "Total"
   });
 
   // Debounce reduzido para 150ms - mais responsivo
@@ -85,10 +87,11 @@ export default function Dashboard() {
   const [biometricsData, setBiometricsData] = useState([]);
   const [evolutionData, setEvolutionData] = useState([]);
   const [medalTableData, setMedalTableData] = useState<MedalStat[]>([]); 
+  const [topAthletesData, setTopAthletesData] = useState<TopAthlete[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Estados para modais de gráficos maximizados
-  const [expandedChart, setExpandedChart] = useState<'map' | 'biometrics' | 'evolution' | 'medals' | null>(null);
+  const [expandedChart, setExpandedChart] = useState<'map' | 'biometrics' | 'evolution' | 'medals' | 'topAthletes' | null>(null);
 
   // Carregar dados do atleta quando selecionado
   useEffect(() => {
@@ -151,7 +154,7 @@ export default function Dashboard() {
   }, [filteredYears]);
 
   useEffect(() => {
-    if (!debouncedFilters.year) return;
+    if (!debouncedFilters.year && debouncedFilters.year !== null) return;
 
     const cacheKey = getCacheKey(debouncedFilters);
     const cached = getCachedData(cacheKey);
@@ -163,6 +166,7 @@ export default function Dashboard() {
         setBiometricsData(cached.bio);
         setEvolutionData(cached.evo);
         setMedalTableData(cached.table);
+        setTopAthletesData(cached.topAthletes);
       });
       setLoading(false);
       return;
@@ -172,15 +176,16 @@ export default function Dashboard() {
       setLoading(true);
       isLoadingRef.current = true;
       try {
-        const [mapRes, bioRes, evoRes, tableRes] = await Promise.all([
+        const [mapRes, bioRes, evoRes, tableRes, topAthletesRes] = await Promise.all([
           fetchMapStats(debouncedFilters),
           fetchBiometrics(debouncedFilters),
           fetchEvolution(debouncedFilters),
-          fetchMedalTable(debouncedFilters) 
+          fetchMedalTable(debouncedFilters),
+          fetchTopAthletes(debouncedFilters)
         ]);
         
         // Cache os resultados
-        setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes });
+        setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes, topAthletes: topAthletesRes });
         
         // Prefetch do próximo ano durante animação
         if (isPlaying) {
@@ -196,9 +201,10 @@ export default function Dashboard() {
                 fetchMapStats(nextFilters),
                 fetchBiometrics(nextFilters),
                 fetchEvolution(nextFilters),
-                fetchMedalTable(nextFilters)
-              ]).then(([mapR, bioR, evoR, tableR]) => {
-                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoR, table: tableR });
+                fetchMedalTable(nextFilters),
+                fetchTopAthletes(nextFilters)
+              ]).then(([mapR, bioR, evoR, tableR, topAthR]) => {
+                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoR, table: tableR, topAthletes: topAthR });
               }).catch(() => {}); // Silencioso
             }
           }
@@ -210,6 +216,7 @@ export default function Dashboard() {
           setBiometricsData(bioRes);
           setEvolutionData(evoRes);
           setMedalTableData(tableRes);
+          setTopAthletesData(topAthletesRes);
         });
         setError(null);
       } catch (e) {
@@ -254,7 +261,10 @@ export default function Dashboard() {
     };
   }, [isPlaying, filteredYears, playSpeed]);
 
-  const getYearLabel = (year: number) => {
+  const getYearLabel = (year: number | null) => {
+    if (year === null) {
+      return t('all_years') || 'Todos os Anos';
+    }
     const seasons = yearSeasonMap[year];
     if (!seasons) return `${year}`;
     if (filters.season !== "Both") {
@@ -381,6 +391,34 @@ export default function Dashboard() {
             />
           </div>
 
+          {/* Filtro de Medalha */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 block">{t('medal_filter')}</label>
+            <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner flex-wrap gap-1">
+              {[
+                { id: "Total", label: t('filter_total') || "Total" },
+                { id: "Gold", label: t('filter_gold') || "Ouro" },
+                { id: "Silver", label: t('filter_silver') || "Prata" },
+                { id: "Bronze", label: t('filter_bronze') || "Bronze" }
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setFilters(prev => ({ ...prev, medal_type: m.id }))}
+                  className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all min-w-[60px] ${
+                    filters.medal_type === m.id 
+                      ? m.id === "Gold" ? "bg-yellow-400 text-yellow-900 shadow-sm scale-105"
+                        : m.id === "Silver" ? "bg-slate-300 text-slate-700 shadow-sm scale-105"
+                        : m.id === "Bronze" ? "bg-orange-400 text-orange-900 shadow-sm scale-105"
+                        : "bg-white text-olympic-blue shadow-sm scale-105"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Buscar Atleta */}
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 block">
@@ -488,6 +526,30 @@ export default function Dashboard() {
                   </section>
                 </div>
 
+                {/* Top 10 Atletas */}
+                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-[400px] shrink-0">
+                  <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
+                    <h2 className="font-bold text-slate-800">
+                      {t('top_athletes_title')}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      {filters.medal_type && filters.medal_type !== "Total" && (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          filters.medal_type === "Gold" ? "bg-yellow-100 text-yellow-700" :
+                          filters.medal_type === "Silver" ? "bg-slate-200 text-slate-700" :
+                          "bg-orange-100 text-orange-700"
+                        }`}>
+                          {filters.medal_type === "Gold" ? t('gold') : filters.medal_type === "Silver" ? t('silver') : t('bronze')}
+                        </span>
+                      )}
+                      <MaximizeButton onClick={() => setExpandedChart('topAthletes')} label={t('expand') || 'Expandir'} />
+                    </div>
+                  </div>
+                  <div className="flex-1 p-4 min-h-0">
+                    <TopAthletesChart data={topAthletesData} medalType={filters.medal_type} />
+                  </div>
+                </section>
+
               </div>
 
               {/* Coluna Direita (Quadro de Medalhas / Perfil do Atleta) */}
@@ -538,7 +600,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-4 shrink-0">
                 <button 
                   onClick={() => setIsPlaying(!isPlaying)}
-                  disabled={loading && isPlaying}
+                  disabled={(loading && isPlaying) || filters.year === null}
                   className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 disabled:opacity-50 shrink-0 ${
                     isPlaying 
                       ? "bg-amber-400 text-white hover:bg-amber-500 ring-4 ring-amber-100" 
@@ -557,7 +619,7 @@ export default function Dashboard() {
                 <div className="flex flex-col min-w-[120px]">
                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('edition')}</span>
                    <span className="text-lg font-bold text-slate-800 leading-none whitespace-nowrap">
-                      {getYearLabel(filters.year || 2016)}
+                      {getYearLabel(filters.year ?? null)}
                    </span>
                 </div>
               </div>
@@ -586,12 +648,36 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Botão Todos os Anos */}
+              <div className="flex items-center gap-2 pl-4 border-l border-slate-200 shrink-0">
+                <button
+                  onClick={() => {
+                    if (filters.year === null) {
+                      // Volta para o último ano
+                      const lastYear = filteredYears[filteredYears.length - 1] || 2016;
+                      setFilters(prev => ({ ...prev, year: lastYear }));
+                    } else {
+                      // Ativa "Todos os anos"
+                      setIsPlaying(false);
+                      setFilters(prev => ({ ...prev, year: null }));
+                    }
+                  }}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase rounded-md transition-all whitespace-nowrap ${
+                    filters.year === null
+                      ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {filters.year === null ? (t('all_years') || 'Todos os Anos') + ' ✓' : (t('all_years') || 'Todos os Anos')}
+                </button>
+              </div>
+
               {/* Slider */}
-              <div className="flex-1 w-full min-w-0">
+              <div className={`flex-1 w-full min-w-0 ${filters.year === null ? 'opacity-40 pointer-events-none' : ''}`}>
                  <RangeSlider 
                    min={filteredYears[0] || 1896} 
                    max={filteredYears[filteredYears.length - 1] || 2016} 
-                   value={filters.year || 2016}
+                   value={filters.year ?? filteredYears[filteredYears.length - 1] ?? 2016}
                    onChange={(val) => {
                      const closest = filteredYears.reduce((prev, curr) => 
                        Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev
@@ -610,7 +696,7 @@ export default function Dashboard() {
         isOpen={expandedChart === 'map'}
         onClose={() => setExpandedChart(null)}
         title={t('map_title')}
-        subtitle={`${filters.season === 'Both' ? t('both') : filters.season === 'Summer' ? t('summer') : t('winter')} - ${getYearLabel(filters.year || 2016)}`}
+        subtitle={`${filters.season === 'Both' ? t('both') : filters.season === 'Summer' ? t('summer') : t('winter')} - ${getYearLabel(filters.year ?? null)}`}
       >
         <WorldMap data={mapData} />
       </ChartModal>
@@ -619,7 +705,7 @@ export default function Dashboard() {
         isOpen={expandedChart === 'biometrics'}
         onClose={() => setExpandedChart(null)}
         title={`${t('biometrics_title')} ${filters.sport === "All" ? t('biometrics_general') : tSport(filters.sport || '')}`}
-        subtitle={getYearLabel(filters.year || 2016)}
+        subtitle={getYearLabel(filters.year ?? null)}
       >
         <BiometricsChart data={biometricsData} />
       </ChartModal>
@@ -639,7 +725,7 @@ export default function Dashboard() {
         isOpen={expandedChart === 'medals'}
         onClose={() => setExpandedChart(null)}
         title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')}
-        subtitle={getYearLabel(filters.year || 2016)}
+        subtitle={getYearLabel(filters.year ?? null)}
       >
         <div className="h-full overflow-auto">
           <MedalTable 
@@ -647,6 +733,15 @@ export default function Dashboard() {
             title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')}
           />
         </div>
+      </ChartModal>
+
+      <ChartModal
+        isOpen={expandedChart === 'topAthletes'}
+        onClose={() => setExpandedChart(null)}
+        title={t('top_athletes_title')}
+        subtitle={getYearLabel(filters.year ?? null)}
+      >
+        <TopAthletesChart data={topAthletesData} medalType={filters.medal_type} />
       </ChartModal>
     </div>
   );
