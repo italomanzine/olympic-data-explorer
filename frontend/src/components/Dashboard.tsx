@@ -295,13 +295,18 @@ export default function Dashboard() {
         } lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none flex flex-col`}
       >
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-100 shrink-0">
-          <div className="flex gap-1 items-center">
-             <div className="flex gap-0.5">
-                <span className="w-2 h-2 rounded-full bg-olympic-blue"></span>
-                <span className="w-2 h-2 rounded-full bg-olympic-yellow"></span>
-                <span className="w-2 h-2 rounded-full bg-olympic-black"></span>
+          <div className="flex gap-2 items-center">
+             {/* Anéis Olímpicos */}
+             <div className="relative w-10 h-6 shrink-0">
+                {/* Linha superior: azul, preto, vermelho */}
+                <span className="absolute left-0 top-0 w-3 h-3 rounded-full bg-transparent" style={{ border: '2px solid #0081C8' }}></span>
+                <span className="absolute left-2.5 top-0 w-3 h-3 rounded-full bg-transparent" style={{ border: '2px solid #000000' }}></span>
+                <span className="absolute left-5 top-0 w-3 h-3 rounded-full bg-transparent" style={{ border: '2px solid #EE334E' }}></span>
+                {/* Linha inferior: amarelo, verde */}
+                <span className="absolute left-[5px] top-1.5 w-3 h-3 rounded-full bg-transparent" style={{ border: '2px solid #FCB131' }}></span>
+                <span className="absolute left-[15px] top-1.5 w-3 h-3 rounded-full bg-transparent" style={{ border: '2px solid #00A651' }}></span>
              </div>
-             <span className="font-bold text-lg tracking-tight ml-2">Olympic Data</span>
+             <span className="font-bold text-lg tracking-tight">Olympic Data</span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400">
             <Menu className="w-5 h-5" />
