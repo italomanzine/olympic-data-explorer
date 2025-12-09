@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback, useTransition } from "react";
 import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, FilterState, MedalStat } from "../lib/api";
 import WorldMap from "./charts/WorldMap";
 import BiometricsChart from "./charts/BiometricsChart";
@@ -8,8 +8,8 @@ import EvolutionChart from "./charts/EvolutionChart";
 import MedalTable from "./MedalTable"; 
 import RangeSlider from "./ui/RangeSlider";
 import SearchableSelect from "./ui/SearchableSelect";
-import LanguageSelector from "./ui/LanguageSelector"; // Importado
-import { useLanguage } from "../contexts/LanguageContext"; // Importado
+import LanguageSelector from "./ui/LanguageSelector";
+import { useLanguage } from "../contexts/LanguageContext";
 import { Loader2, AlertCircle, Play, Pause, Menu, Settings2, Globe } from "lucide-react";
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -25,9 +25,30 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// Cache simples para evitar re-fetches desnecessários
+const dataCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 segundos
+
+function getCacheKey(filters: FilterState): string {
+  return JSON.stringify(filters);
+}
+
+function getCachedData(key: string) {
+  const cached = dataCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedData(key: string, data: any) {
+  dataCache.set(key, { data, timestamp: Date.now() });
+}
+
 export default function Dashboard() {
-  const { t, tSport, tCountry } = useLanguage(); // Hook de Tradução
+  const { t, tSport, tCountry } = useLanguage();
   const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   const [allYears, setAllYears] = useState<number[]>([]);
@@ -43,7 +64,8 @@ export default function Dashboard() {
     year: 2016
   });
 
-  const debouncedFilters = useDebounce(filters, 500);
+  // Debounce reduzido para 150ms - mais responsivo
+  const debouncedFilters = useDebounce(filters, 150);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,6 +117,21 @@ export default function Dashboard() {
   useEffect(() => {
     if (!debouncedFilters.year) return;
 
+    const cacheKey = getCacheKey(debouncedFilters);
+    const cached = getCachedData(cacheKey);
+    
+    if (cached) {
+      // Usar dados do cache instantaneamente
+      startTransition(() => {
+        setMapData(cached.map);
+        setBiometricsData(cached.bio);
+        setEvolutionData(cached.evo);
+        setMedalTableData(cached.table);
+      });
+      setLoading(false);
+      return;
+    }
+
     async function loadData() {
       setLoading(true);
       try {
@@ -105,10 +142,16 @@ export default function Dashboard() {
           fetchMedalTable(debouncedFilters) 
         ]);
         
-        setMapData(mapRes);
-        setBiometricsData(bioRes);
-        setEvolutionData(evoRes);
-        setMedalTableData(tableRes);
+        // Cache os resultados
+        setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes });
+        
+        // Usar startTransition para não bloquear a UI
+        startTransition(() => {
+          setMapData(mapRes);
+          setBiometricsData(bioRes);
+          setEvolutionData(evoRes);
+          setMedalTableData(tableRes);
+        });
         setError(null);
       } catch (e) {
         console.error(e);
@@ -309,7 +352,7 @@ export default function Dashboard() {
             <div className="flex flex-col xl:flex-row gap-6 h-full">
               
               {/* Coluna Esquerda (Gráficos) - Flex Grow */}
-              <div className="flex-[3] flex flex-col gap-6 min-w-0">
+              <div className="flex-3 flex flex-col gap-6 min-w-0">
                 
                 {/* Mapa */}
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[450px] flex flex-col transition-all hover:shadow-md shrink-0">

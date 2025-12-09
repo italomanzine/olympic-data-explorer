@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, memo } from "react";
 import {
   ScatterChart,
   Scatter,
@@ -36,7 +36,7 @@ interface GroupedBiometricData {
   Athletes: BiometricData[];
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
 
   if (active && payload && payload.length) {
@@ -105,9 +105,11 @@ const CustomTooltip = ({ active, payload }: any) => {
     );
   }
   return null;
-};
+});
 
-export default function BiometricsChart({ data }: BiometricsChartProps) {
+CustomTooltip.displayName = 'CustomTooltip';
+
+function BiometricsChart({ data }: BiometricsChartProps) {
   const { t } = useLanguage();
 
   const groupedData = useMemo(() => {
@@ -145,7 +147,7 @@ export default function BiometricsChart({ data }: BiometricsChartProps) {
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full transition-opacity duration-300">
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 20, right: 20, bottom: 50, left: 40 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -157,7 +159,7 @@ export default function BiometricsChart({ data }: BiometricsChartProps) {
             stroke="#94A3B8"
             label={{
               value: `${t("weight")} (kg)`,
-              position: "bottom", // fora da área do gráfico
+              position: "bottom",
               offset: 10,
               fill: "#94A3B8",
             }}
@@ -192,6 +194,8 @@ export default function BiometricsChart({ data }: BiometricsChartProps) {
             fill="#EE334E"
             fillOpacity={0.6}
             shape="circle"
+            animationDuration={400}
+            animationEasing="ease-out"
           />
           <Scatter
             name={t("male")}
@@ -199,9 +203,13 @@ export default function BiometricsChart({ data }: BiometricsChartProps) {
             fill="#0081C8"
             fillOpacity={0.6}
             shape="triangle"
+            animationDuration={400}
+            animationEasing="ease-out"
           />
         </ScatterChart>
       </ResponsiveContainer>
     </div>
   );
 }
+
+export default memo(BiometricsChart);

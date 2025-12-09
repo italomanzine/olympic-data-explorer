@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { MedalStat } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 
@@ -9,11 +9,43 @@ interface MedalTableProps {
   title: string;
 }
 
-export default function MedalTable({ data, title }: MedalTableProps) {
+const MedalRow = memo(({ row, index, displayName }: { row: MedalStat; index: number; displayName: string }) => (
+  <tr className="hover:bg-slate-50/50 transition-colors duration-150">
+    <td className="px-4 py-3 text-center font-medium text-slate-400">{index + 1}</td>
+    <td className="px-4 py-3 font-medium text-slate-700 truncate max-w-[150px]" title={displayName}>
+      {displayName}
+    </td>
+    <td className="px-2 py-3 text-center font-bold text-yellow-600 bg-yellow-50/30">{row.gold}</td>
+    <td className="px-2 py-3 text-center font-bold text-slate-600 bg-slate-50/30">{row.silver}</td>
+    <td className="px-2 py-3 text-center font-bold text-amber-700 bg-amber-50/30">{row.bronze}</td>
+    <td className="px-4 py-3 text-center font-bold text-slate-900">{row.total}</td>
+  </tr>
+));
+
+MedalRow.displayName = 'MedalRow';
+
+function MedalTable({ data, title }: MedalTableProps) {
   const { t, tCountry, tSport } = useLanguage();
 
+  // Pré-calcular os nomes traduzidos
+  const translatedData = useMemo(() => {
+    return data.map(row => {
+      let displayName = row.name;
+      const translatedCountry = tCountry(row.code);
+      if (translatedCountry) {
+        displayName = `${translatedCountry} (${row.code})`;
+      } else {
+        const translatedSport = tSport(row.code);
+        if (translatedSport !== row.code) {
+          displayName = translatedSport;
+        }
+      }
+      return { ...row, displayName };
+    });
+  }, [data, tCountry, tSport]);
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300">
       <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
         <h2 className="font-bold text-slate-800 text-lg">{title}</h2>
       </div>
@@ -31,40 +63,15 @@ export default function MedalTable({ data, title }: MedalTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {data.length > 0 ? (
-              data.map((row, index) => {
-                // row.code pode ser um código NOC (USA) ou um nome de Esporte (Swimming) dependendo do contexto
-                // Vamos tentar traduzir ambos.
-                // Se for NOC, tCountry resolve. Se for Sport, tSport resolve.
-                
-                let displayName = row.name;
-                // Verifica se row.code parece um NOC (3 letras maiusculas) ou se é um nome de esporte
-                // Mas o row.name já vem do backend como "Nome (CODE)" ou "Esporte".
-                
-                // Se row.code existir na lista de países, traduz como país
-                const translatedCountry = tCountry(row.code);
-                if (translatedCountry) {
-                    displayName = `${translatedCountry} (${row.code})`;
-                } else {
-                    // Tenta traduzir como esporte (row.code aqui é o nome do esporte em inglês pois usamos como chave no backend)
-                    const translatedSport = tSport(row.code);
-                    if (translatedSport !== row.code) {
-                        displayName = translatedSport;
-                    }
-                }
-
-                return (
-                <tr key={row.code} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3 text-center font-medium text-slate-400">{index + 1}</td>
-                  <td className="px-4 py-3 font-medium text-slate-700 truncate max-w-[150px]" title={displayName}>
-                    {displayName}
-                  </td>
-                  <td className="px-2 py-3 text-center font-bold text-yellow-600 bg-yellow-50/30">{row.gold}</td>
-                  <td className="px-2 py-3 text-center font-bold text-slate-600 bg-slate-50/30">{row.silver}</td>
-                  <td className="px-2 py-3 text-center font-bold text-amber-700 bg-amber-50/30">{row.bronze}</td>
-                  <td className="px-4 py-3 text-center font-bold text-slate-900">{row.total}</td>
-                </tr>
-              )})
+            {translatedData.length > 0 ? (
+              translatedData.map((row, index) => (
+                <MedalRow
+                  key={row.code}
+                  row={row}
+                  index={index}
+                  displayName={row.displayName}
+                />
+              ))
             ) : (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">
@@ -78,3 +85,5 @@ export default function MedalTable({ data, title }: MedalTableProps) {
     </div>
   );
 }
+
+export default memo(MedalTable);

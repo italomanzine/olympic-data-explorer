@@ -24,3 +24,59 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Otimizações de performance para animações */
+.recharts-wrapper,
+.recharts-surface {
+  will-change: auto;
+}
+
+/* Transições suaves nos gráficos */
+.recharts-scatter-symbol,
+.recharts-area-area,
+.recharts-area-curve {
+  transition: opacity 0.3s ease-out, fill 0.3s ease-out;
+}
+
+/* Animação suave para tabelas */
+tbody tr {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0.7;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar customizada com performance */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Otimização de GPU para transições */
+.transition-transform,
+.transition-opacity,
+.transition-all {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}

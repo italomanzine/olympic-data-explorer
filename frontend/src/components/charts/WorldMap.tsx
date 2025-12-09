@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, memo } from "react";
+import { createPortal } from "react-dom";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { scaleLinear } from "d3-scale";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -20,14 +21,105 @@ interface WorldMapProps {
   data: MapData[];
 }
 
-export default function WorldMap({ data }: WorldMapProps) {
+// Função para calcular posição do tooltip evitando sair da tela
+function calculateTooltipPosition(
+  mouseX: number, 
+  mouseY: number, 
+  tooltipWidth: number = 160, 
+  tooltipHeight: number = 130
+) {
+  const padding = 10;
+  const cursorOffset = 12;
+  
+  let left = mouseX + cursorOffset;
+  let top = mouseY + cursorOffset;
+  
+  // Ajusta se ultrapassa a borda direita
+  if (left + tooltipWidth > window.innerWidth - padding) {
+    left = mouseX - tooltipWidth - cursorOffset;
+  }
+  
+  // Ajusta se ultrapassa a borda inferior
+  if (top + tooltipHeight > window.innerHeight - padding) {
+    top = mouseY - tooltipHeight - cursorOffset;
+  }
+  
+  // Garante que não saia pela esquerda
+  if (left < padding) {
+    left = padding;
+  }
+  
+  // Garante que não saia pelo topo
+  if (top < padding) {
+    top = padding;
+  }
+  
+  return { left, top };
+}
+
+// Componente de Tooltip renderizado via Portal
+interface TooltipProps {
+  content: { name: string; stats?: MapData; x: number; y: number };
+  t: (key: string) => string;
+}
+
+function TooltipPortal({ content, t }: TooltipProps) {
+  const pos = calculateTooltipPosition(content.x, content.y);
+
+  // Verifica se estamos no cliente (necessário para createPortal)
+  if (typeof window === 'undefined') return null;
+
+  return createPortal(
+    <div 
+      className="fixed z-50 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-xl rounded-lg p-2 sm:p-3 pointer-events-none text-xs sm:text-sm"
+      style={{ 
+        left: pos.left,
+        top: pos.top,
+        maxWidth: 'min(200px, calc(100vw - 24px))'
+      }}
+    >
+      <p className="font-bold text-slate-800 mb-1 truncate">{content.name}</p>
+      {content.stats ? (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 shrink-0"></span>
+            <span className="whitespace-nowrap text-slate-700">{t('gold')}: <span className="font-semibold text-slate-900">{content.stats.gold}</span></span>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span>
+            <span className="whitespace-nowrap text-slate-700">{t('silver')}: <span className="font-semibold text-slate-900">{content.stats.silver}</span></span>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-600 shrink-0"></span>
+            <span className="whitespace-nowrap text-slate-700">{t('bronze')}: <span className="font-semibold text-slate-900">{content.stats.bronze}</span></span>
+          </div>
+          <div className="font-semibold mt-1 pt-1 border-t border-slate-200 text-slate-800">
+            {t('total')}: <span className="text-slate-900">{content.stats.total}</span>
+          </div>
+        </div>
+      ) : (
+        <span className="text-slate-500 italic">{t('no_data')}</span>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+function WorldMap({ data }: WorldMapProps) {
   const { t, tCountry } = useLanguage();
   const [tooltipContent, setTooltipContent] = useState<{
-    x: number;
-    y: number;
     name: string;
     stats?: MapData;
+    x: number;
+    y: number;
   } | null>(null);
+
+  // Criar um Map para lookup O(1) em vez de find O(n)
+  const dataMap = useMemo(() => {
+    const map = new Map<string, MapData>();
+    data.forEach(d => map.set(d.id, d));
+    return map;
+  }, [data]);
 
   const maxTotal = useMemo(() => {
     return data.length > 0 ? Math.max(...data.map((d) => d.total), 5) : 5;
@@ -39,8 +131,17 @@ export default function WorldMap({ data }: WorldMapProps) {
       .range(["#F1F5F9", "#FBBF24"]);
   }, [maxTotal]);
 
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (tooltipContent) {
+      setTooltipContent(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+    }
+  };
+
   return (
-    <div className="relative w-full h-[450px] bg-slate-50 rounded-xl overflow-hidden border border-slate-100 group">
+    <div 
+      className="relative w-full h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px] bg-slate-50 rounded-xl overflow-hidden border border-slate-100 group"
+      onMouseMove={handleMouseMove}
+    >
       <ComposableMap 
         projection="geoMercator" 
         projectionConfig={{ scale: 110, center: [0, 20] }}
@@ -55,7 +156,7 @@ export default function WorldMap({ data }: WorldMapProps) {
                 const countryId = geo.id || geo.properties?.ISO_A3 || geo.properties?.name; 
                 const countryName = geo.properties?.name || countryId;
                 
-                const cur = data.find((s) => s.id === countryId);
+                const cur = dataMap.get(countryId);
                 
                 return (
                   <Geography
@@ -69,21 +170,21 @@ export default function WorldMap({ data }: WorldMapProps) {
                       hover: { fill: "#3B82F6", outline: "none", cursor: "pointer" },
                       pressed: { outline: "none" },
                     }}
-                    onMouseEnter={(evt) => {}}
-                    onMouseMove={(evt) => {
+                    onMouseEnter={(evt) => {
                       let displayName = countryName;
                       if (countryId) {
                         try {
                            const translated = tCountry(countryId);
                            if (translated) displayName = translated;
-                        } catch (e) { }
+                        } catch { }
                       }
 
+                      const e = evt as unknown as React.MouseEvent;
                       setTooltipContent({
-                        x: evt.clientX,
-                        y: evt.clientY,
                         name: displayName,
-                        stats: cur
+                        stats: cur,
+                        x: e.clientX,
+                        y: e.clientY
                       });
                     }}
                     onMouseLeave={() => {
@@ -97,47 +198,19 @@ export default function WorldMap({ data }: WorldMapProps) {
         </ZoomableGroup>
       </ComposableMap>
       
-      {/* Tooltip Flutuante */}
-      {tooltipContent && (
-        <div 
-          className="fixed z-50 bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-lg p-3 pointer-events-none text-sm transform -translate-x-1/2 -translate-y-full mt-[-10px]"
-          style={{ left: tooltipContent.x, top: tooltipContent.y }}
-        >
-          <p className="font-bold text-slate-800 mb-1">{tooltipContent.name}</p>
-          {tooltipContent.stats ? (
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-                <span>{t('gold')}: {tooltipContent.stats.gold}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                <span>{t('silver')}: {tooltipContent.stats.silver}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-700"></span>
-                <span>{t('bronze')}: {tooltipContent.stats.bronze}</span>
-              </div>
-              <div className="font-semibold mt-1 pt-1 border-t border-slate-100 text-slate-600">
-                {t('total')}: {tooltipContent.stats.total}
-              </div>
-            </div>
-          ) : (
-            <span className="text-slate-400 italic">{t('no_data')}</span>
-          )}
-        </div>
-      )}
+      {/* Tooltip Flutuante via Portal - renderizado fora do container */}
+      {tooltipContent && <TooltipPortal content={tooltipContent} t={t} />}
 
-      {/* Legenda de Gradiente Melhorada - Reposicionada */}
-      <div className="absolute bottom-12 right-12 bg-white/95 backdrop-blur p-4 rounded-xl shadow-md border border-slate-100 flex flex-col gap-2 min-w-[220px] z-10">
-        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+      {/* Legenda de Gradiente Responsiva */}
+      <div className="absolute bottom-2 sm:bottom-4 md:bottom-8 lg:bottom-12 left-2 sm:left-auto sm:right-4 md:right-8 lg:right-12 bg-white/95 backdrop-blur p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl shadow-md border border-slate-100 flex flex-col gap-1 sm:gap-2 min-w-[140px] sm:min-w-[180px] md:min-w-[220px] z-10">
+        <div className="flex justify-between items-center text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           <span>{t('few_medals')}</span>
           <span>{t('many_medals')}</span>
         </div>
-        <div className="relative h-3 w-full">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#F1F5F9] via-[#FDE68A] to-[#FBBF24] border border-slate-100"></div>
+        <div className="relative h-2 sm:h-3 w-full">
+          <div className="absolute inset-0 rounded-full bg-linear-to-r from-[#F1F5F9] via-[#FDE68A] to-[#FBBF24] border border-slate-100"></div>
         </div>
-        <div className="flex justify-between text-[10px] text-slate-400 font-medium px-0.5">
+        <div className="flex justify-between text-[8px] sm:text-[9px] md:text-[10px] text-slate-400 font-medium px-0.5">
           <span>0</span>
           <span>{maxTotal}+</span>
         </div>
@@ -145,3 +218,5 @@ export default function WorldMap({ data }: WorldMapProps) {
     </div>
   );
 }
+
+export default memo(WorldMap);

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLanguage } from "../../contexts/LanguageContext";
 
@@ -15,11 +15,10 @@ interface EvolutionChartProps {
 
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#0088FE", "#00C49F"];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = memo(({ active, payload, label }: any) => {
   const { t } = useLanguage();
   
   if (active && payload && payload.length) {
-    // Ordenar payload por valor (decrescente)
     const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
 
     return (
@@ -41,24 +40,31 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     );
   }
   return null;
-};
+});
 
-export default function EvolutionChart({ data }: EvolutionChartProps) {
+CustomTooltip.displayName = 'CustomTooltip';
+
+function EvolutionChart({ data }: EvolutionChartProps) {
   const { t } = useLanguage();
-  const keys = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'Year') : [];
+  
+  const keys = useMemo(() => {
+    return data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'Year') : [];
+  }, [data]);
+
+  const gradients = useMemo(() => {
+    return keys.map((key, i) => (
+      <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.6}/>
+        <stop offset="95%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.1}/>
+      </linearGradient>
+    ));
+  }, [keys]);
 
   return (
-    <div className="w-full h-full bg-white rounded-xl">
+    <div className="w-full h-full bg-white rounded-xl transition-opacity duration-300">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
-          <defs>
-            {keys.map((key, i) => (
-              <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.6}/>
-                <stop offset="95%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.1}/>
-              </linearGradient>
-            ))}
-          </defs>
+          <defs>{gradients}</defs>
           <XAxis 
             dataKey="Year" 
             stroke="#94A3B8"
@@ -76,10 +82,11 @@ export default function EvolutionChart({ data }: EvolutionChartProps) {
               key={key}
               type="monotone" 
               dataKey={key} 
-              // stackId removido para mostrar valores reais (overlapping)
               stroke={COLORS[i % COLORS.length]} 
               fill={`url(#color${key})`} 
               strokeWidth={2}
+              animationDuration={400}
+              animationEasing="ease-out"
             />
           ))}
         </AreaChart>
@@ -87,3 +94,5 @@ export default function EvolutionChart({ data }: EvolutionChartProps) {
     </div>
   );
 }
+
+export default memo(EvolutionChart);
