@@ -68,7 +68,9 @@ export default function Dashboard() {
   const debouncedFilters = useDebounce(filters, 150);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playSpeed, setPlaySpeed] = useState(2000); // Velocidade da animação em ms
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isLoadingRef = useRef(false); // Referência para evitar avançar durante carregamento
 
   const [mapData, setMapData] = useState([]);
   const [biometricsData, setBiometricsData] = useState([]);
@@ -134,6 +136,7 @@ export default function Dashboard() {
 
     async function loadData() {
       setLoading(true);
+      isLoadingRef.current = true;
       try {
         const [mapRes, bioRes, evoRes, tableRes] = await Promise.all([
           fetchMapStats(debouncedFilters),
@@ -144,6 +147,28 @@ export default function Dashboard() {
         
         // Cache os resultados
         setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes });
+        
+        // Prefetch do próximo ano durante animação
+        if (isPlaying) {
+          const currentIndex = filteredYears.indexOf(debouncedFilters.year || 2016);
+          const nextIndex = currentIndex + 1;
+          if (nextIndex < filteredYears.length) {
+            const nextYear = filteredYears[nextIndex];
+            const nextFilters = { ...debouncedFilters, year: nextYear };
+            const nextCacheKey = getCacheKey(nextFilters);
+            if (!getCachedData(nextCacheKey)) {
+              // Prefetch silencioso do próximo ano
+              Promise.all([
+                fetchMapStats(nextFilters),
+                fetchBiometrics(nextFilters),
+                fetchEvolution(nextFilters),
+                fetchMedalTable(nextFilters)
+              ]).then(([mapR, bioR, evoR, tableR]) => {
+                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoR, table: tableR });
+              }).catch(() => {}); // Silencioso
+            }
+          }
+        }
         
         // Usar startTransition para não bloquear a UI
         startTransition(() => {
@@ -158,15 +183,21 @@ export default function Dashboard() {
         if (!isPlaying) setError("Erro ao carregar dados.");
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
       }
     }
     
     loadData();
-  }, [debouncedFilters]);
+  }, [debouncedFilters, isPlaying, filteredYears]);
 
   useEffect(() => {
     if (isPlaying) {
-      playIntervalRef.current = setInterval(() => {
+      const advanceYear = () => {
+        // Só avança se não estiver carregando
+        if (isLoadingRef.current) {
+          return;
+        }
+        
         setFilters(prev => {
           const currentIndex = filteredYears.indexOf(prev.year || 2016);
           const nextIndex = currentIndex + 1;
@@ -178,14 +209,16 @@ export default function Dashboard() {
           
           return { ...prev, year: filteredYears[nextIndex] };
         });
-      }, 1500);
+      };
+      
+      playIntervalRef.current = setInterval(advanceYear, playSpeed);
     } else {
       if (playIntervalRef.current) clearInterval(playIntervalRef.current);
     }
     return () => {
       if (playIntervalRef.current) clearInterval(playIntervalRef.current);
     };
-  }, [isPlaying, filteredYears]);
+  }, [isPlaying, filteredYears, playSpeed]);
 
   const getYearLabel = (year: number) => {
     const seasons = yearSeasonMap[year];
@@ -421,13 +454,20 @@ export default function Dashboard() {
             <div className="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
               <button 
                 onClick={() => setIsPlaying(!isPlaying)}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 ${
+                disabled={loading && isPlaying}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 disabled:opacity-50 ${
                   isPlaying 
                     ? "bg-amber-400 text-white hover:bg-amber-500 ring-4 ring-amber-100" 
                     : "bg-slate-800 text-white hover:bg-slate-700 ring-4 ring-slate-100"
                 }`}
               >
-                {isPlaying ? <Pause className="fill-current w-5 h-5" /> : <Play className="fill-current w-5 h-5 ml-1" />}
+                {loading && isPlaying ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="fill-current w-5 h-5" />
+                ) : (
+                  <Play className="fill-current w-5 h-5 ml-1" />
+                )}
               </button>
               
               <div className="flex flex-col">
@@ -435,6 +475,30 @@ export default function Dashboard() {
                  <span className="text-lg font-bold text-slate-800 leading-none whitespace-nowrap">
                     {getYearLabel(filters.year || 2016)}
                  </span>
+              </div>
+
+              {/* Controle de velocidade */}
+              <div className="hidden sm:flex items-center gap-2 ml-2 pl-4 border-l border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vel:</span>
+                <div className="flex gap-1">
+                  {[
+                    { label: '0.5x', value: 4000 },
+                    { label: '1x', value: 2000 },
+                    { label: '2x', value: 1000 },
+                  ].map(speed => (
+                    <button
+                      key={speed.value}
+                      onClick={() => setPlaySpeed(speed.value)}
+                      className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+                        playSpeed === speed.value
+                          ? 'bg-slate-800 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {speed.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
