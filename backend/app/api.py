@@ -163,7 +163,7 @@ def get_evolution(
     medals_deduped = medals_only_base.drop_duplicates(subset=['Year', 'Season', 'NOC', 'Event', 'Medal'])
 
     if not target_countries:
-        top_countries = medals_deduped['NOC'].value_counts().head(5).index.tolist()
+        top_countries = medals_deduped['NOC'].value_counts().head(10).index.tolist()
         target_countries = top_countries
         
     mask = medals_deduped['NOC'].isin(target_countries)
