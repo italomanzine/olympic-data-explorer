@@ -67,6 +67,8 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_profile: "Perfil do Atleta",
     athlete_evolution: "Evolução do Atleta",
     athlete_medals: "Medalhas do Atleta",
+    expand: "Expandir",
+    all_editions: "Todas as edições",
   },
   'en': {
     app_title: "Olympic Dashboard",
@@ -121,6 +123,8 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_profile: "Athlete Profile",
     athlete_evolution: "Athlete Evolution",
     athlete_medals: "Athlete Medals",
+    expand: "Expand",
+    all_editions: "All editions",
   },
   'es': {
     app_title: "Tablero Olímpico",
@@ -175,6 +179,8 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_profile: "Perfil del Atleta",
     athlete_evolution: "Evolución del Atleta",
     athlete_medals: "Medallas del Atleta",
+    expand: "Expandir",
+    all_editions: "Todas las ediciones",
   },
   'fr': {
     app_title: "Tableau de Bord Olympique",
@@ -229,6 +235,8 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_profile: "Profil de l'Athlète",
     athlete_evolution: "Évolution de l'Athlète",
     athlete_medals: "Médailles de l'Athlète",
+    expand: "Agrandir",
+    all_editions: "Toutes les éditions",
   },
   'zh': {
     app_title: "奥运仪表板",
@@ -283,6 +291,8 @@ export const translations: Record<Language, Record<string, string>> = {
     athlete_profile: "运动员档案",
     athlete_evolution: "运动员发展",
     athlete_medals: "运动员奖牌",
+    expand: "展开",
+    all_editions: "所有版本",
   }
 };
 

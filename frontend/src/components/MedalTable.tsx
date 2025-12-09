@@ -4,10 +4,12 @@ import React, { memo, useMemo } from 'react';
 import { MedalStat } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import CountryFlag from "./ui/CountryFlag";
+import { Maximize2 } from "lucide-react";
 
 interface MedalTableProps {
   data: MedalStat[];
   title: string;
+  onExpand?: () => void;
 }
 
 // Verificar se é um código de país (NOC) - tipicamente 3 letras maiúsculas
@@ -35,7 +37,7 @@ const MedalRow = memo(({ row, index, displayName, showFlag }: { row: MedalStat; 
 
 MedalRow.displayName = 'MedalRow';
 
-function MedalTable({ data, title }: MedalTableProps) {
+function MedalTable({ data, title, onExpand }: MedalTableProps) {
   const { t, tCountry, tSport } = useLanguage();
 
   // Pré-calcular os nomes traduzidos e se devemos mostrar bandeiras
@@ -63,6 +65,18 @@ function MedalTable({ data, title }: MedalTableProps) {
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300">
       <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
         <h2 className="font-bold text-slate-800 text-lg">{title}</h2>
+        {onExpand && (
+          <button
+            onClick={onExpand}
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-all group flex items-center gap-1.5"
+            title={t('expand') || 'Expandir'}
+          >
+            <Maximize2 className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            <span className="text-xs text-slate-400 group-hover:text-slate-600 hidden sm:inline">
+              {t('expand') || 'Expandir'}
+            </span>
+          </button>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">

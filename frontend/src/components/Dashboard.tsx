@@ -11,6 +11,7 @@ import SearchableSelect from "./ui/SearchableSelect";
 import LanguageSelector from "./ui/LanguageSelector";
 import AthleteSearch from "./ui/AthleteSearch";
 import AthleteProfileCard from "./AthleteProfileCard";
+import ChartModal, { MaximizeButton } from "./ui/ChartModal";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Loader2, AlertCircle, Play, Pause, Menu, Settings2, Globe, User, ChevronUp, ChevronDown } from "lucide-react";
 
@@ -85,6 +86,9 @@ export default function Dashboard() {
   const [evolutionData, setEvolutionData] = useState([]);
   const [medalTableData, setMedalTableData] = useState<MedalStat[]>([]); 
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para modais de gráficos maximizados
+  const [expandedChart, setExpandedChart] = useState<'map' | 'biometrics' | 'evolution' | 'medals' | null>(null);
 
   // Carregar dados do atleta quando selecionado
   useEffect(() => {
@@ -438,9 +442,12 @@ export default function Dashboard() {
                 <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[450px] flex flex-col transition-all hover:shadow-md shrink-0">
                   <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
                     <h2 className="font-bold text-slate-800 text-lg">{t('map_title')}</h2>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                      {filters.season === 'Both' ? t('both') : filters.season === 'Summer' ? t('summer') : t('winter')}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        {filters.season === 'Both' ? t('both') : filters.season === 'Summer' ? t('summer') : t('winter')}
+                      </span>
+                      <MaximizeButton onClick={() => setExpandedChart('map')} label={t('expand') || 'Expandir'} />
+                    </div>
                   </div>
                   <div className="flex-1 relative">
                     <div className="absolute inset-0 p-4">
@@ -454,10 +461,11 @@ export default function Dashboard() {
                    
                    {/* Biometria */}
                    <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-full">
-                    <div className="px-6 py-4 border-b border-slate-100 shrink-0">
+                    <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
                       <h2 className="font-bold text-slate-800 truncate">
                          {t('biometrics_title')} {filters.sport === "All" ? t('biometrics_general') : tSport(filters.sport || '')}
                       </h2>
+                      <MaximizeButton onClick={() => setExpandedChart('biometrics')} label={t('expand') || 'Expandir'} />
                     </div>
                     <div className="flex-1 p-4 min-h-0 h-full">
                       <BiometricsChart data={biometricsData} />
@@ -466,12 +474,13 @@ export default function Dashboard() {
 
                   {/* Evolução */}
                   <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-full">
-                    <div className="px-6 py-4 border-b border-slate-100 shrink-0">
+                    <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
                       <h2 className="font-bold text-slate-800 truncate">
                         {filters.country !== "All" 
                             ? `${t('evolution_country')} ${getCountryLabel(filters.country!, availableCountries.find(c => c.code === filters.country)?.label || '')}` 
                             : t('evolution_title')}
                       </h2>
+                      <MaximizeButton onClick={() => setExpandedChart('evolution')} label={t('expand') || 'Expandir'} />
                     </div>
                     <div className="flex-1 p-4 min-h-0 h-full">
                       <EvolutionChart data={evolutionData} />
@@ -497,7 +506,8 @@ export default function Dashboard() {
                  <div className={selectedAthlete ? '' : 'sticky top-6 h-full'}>
                     <MedalTable 
                         data={medalTableData} 
-                        title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')} 
+                        title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')}
+                        onExpand={() => setExpandedChart('medals')}
                     />
                  </div>
               </div>
@@ -594,6 +604,50 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* Modais de Gráficos Expandidos */}
+      <ChartModal
+        isOpen={expandedChart === 'map'}
+        onClose={() => setExpandedChart(null)}
+        title={t('map_title')}
+        subtitle={`${filters.season === 'Both' ? t('both') : filters.season === 'Summer' ? t('summer') : t('winter')} - ${getYearLabel(filters.year || 2016)}`}
+      >
+        <WorldMap data={mapData} />
+      </ChartModal>
+
+      <ChartModal
+        isOpen={expandedChart === 'biometrics'}
+        onClose={() => setExpandedChart(null)}
+        title={`${t('biometrics_title')} ${filters.sport === "All" ? t('biometrics_general') : tSport(filters.sport || '')}`}
+        subtitle={getYearLabel(filters.year || 2016)}
+      >
+        <BiometricsChart data={biometricsData} />
+      </ChartModal>
+
+      <ChartModal
+        isOpen={expandedChart === 'evolution'}
+        onClose={() => setExpandedChart(null)}
+        title={filters.country !== "All" 
+          ? `${t('evolution_country')} ${getCountryLabel(filters.country!, availableCountries.find(c => c.code === filters.country)?.label || '')}` 
+          : t('evolution_title')}
+        subtitle={t('all_editions') || 'Todas as edições'}
+      >
+        <EvolutionChart data={evolutionData} />
+      </ChartModal>
+
+      <ChartModal
+        isOpen={expandedChart === 'medals'}
+        onClose={() => setExpandedChart(null)}
+        title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')}
+        subtitle={getYearLabel(filters.year || 2016)}
+      >
+        <div className="h-full overflow-auto">
+          <MedalTable 
+            data={medalTableData} 
+            title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')}
+          />
+        </div>
+      </ChartModal>
     </div>
   );
 }
