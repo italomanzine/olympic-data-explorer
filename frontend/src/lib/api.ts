@@ -75,3 +75,75 @@ export async function fetchMedalTable(filters: FilterState): Promise<MedalStat[]
   if (!res.ok) throw new Error("Failed to fetch medal table");
   return res.json();
 }
+
+// ===== Athlete Search & Profile =====
+
+export interface AthleteSearchResult {
+  id: number;
+  name: string;
+  noc: string;
+  sport: string;
+}
+
+export interface AthleteProfile {
+  id: number;
+  name: string;
+  sex: string;
+  noc: string;
+  team: string;
+  height: number | null;
+  weight: number | null;
+  age_range: { min: number | null; max: number | null };
+  sports: string[];
+  years: number[];
+  medals: {
+    gold: number;
+    silver: number;
+    bronze: number;
+    total: number;
+  };
+  participations: {
+    year: number;
+    season: string;
+    city: string | null;
+    sport: string;
+    event: string;
+    medal: string | null;
+  }[];
+}
+
+export interface AthleteStats {
+  evolution: {
+    Year: number;
+    Gold: number;
+    Silver: number;
+    Bronze: number;
+    Total: number;
+    Events: number;
+  }[];
+  biometrics: {
+    height: number | null;
+    weight: number | null;
+    sex: string;
+  };
+  medals_by_sport: MedalStat[];
+}
+
+export async function searchAthletes(query: string): Promise<AthleteSearchResult[]> {
+  if (query.length < 2) return [];
+  const res = await fetch(`${API_BASE_URL}/athletes/search?query=${encodeURIComponent(query)}&limit=20`);
+  if (!res.ok) throw new Error("Failed to search athletes");
+  return res.json();
+}
+
+export async function fetchAthleteProfile(athleteId: number): Promise<AthleteProfile> {
+  const res = await fetch(`${API_BASE_URL}/athletes/${athleteId}`);
+  if (!res.ok) throw new Error("Failed to fetch athlete profile");
+  return res.json();
+}
+
+export async function fetchAthleteStats(athleteId: number): Promise<AthleteStats> {
+  const res = await fetch(`${API_BASE_URL}/athletes/${athleteId}/stats`);
+  if (!res.ok) throw new Error("Failed to fetch athlete stats");
+  return res.json();
+}

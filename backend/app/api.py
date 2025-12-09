@@ -240,3 +240,148 @@ def get_medal_table(
         })
         
     return result
+
+
+@router.get("/athletes/search")
+def search_athletes(
+    query: str = Query(..., min_length=2, description="Nome do atleta para buscar"),
+    limit: int = Query(20, ge=1, le=100)
+):
+    """Busca atletas pelo nome (mínimo 2 caracteres)"""
+    df = data_loader.get_df()
+    
+    # Busca case-insensitive
+    mask = df['Name'].str.contains(query, case=False, na=False)
+    matches = df[mask][['ID', 'Name', 'NOC', 'Sport']].drop_duplicates(subset=['ID'])
+    
+    # Ordenar por relevância (nomes que começam com a query primeiro)
+    matches['starts_with'] = matches['Name'].str.lower().str.startswith(query.lower())
+    matches = matches.sort_values(['starts_with', 'Name'], ascending=[False, True])
+    
+    results = []
+    for _, row in matches.head(limit).iterrows():
+        results.append({
+            "id": int(row['ID']),
+            "name": row['Name'],
+            "noc": row['NOC'],
+            "sport": row['Sport']
+        })
+    
+    return results
+
+
+@router.get("/athletes/{athlete_id}")
+def get_athlete_profile(athlete_id: int):
+    """Retorna o perfil completo de um atleta com todas as suas participações"""
+    df = data_loader.get_df()
+    
+    athlete_data = df[df['ID'] == athlete_id]
+    
+    if athlete_data.empty:
+        return {"error": "Atleta não encontrado"}
+    
+    # Informações básicas (pegar a mais recente)
+    latest = athlete_data.sort_values('Year', ascending=False).iloc[0]
+    
+    # Coletar todas as participações
+    participations = []
+    for _, row in athlete_data.iterrows():
+        participations.append({
+            "year": int(row['Year']),
+            "season": row['Season'],
+            "city": row['City'] if pd.notna(row['City']) else None,
+            "sport": row['Sport'],
+            "event": row['Event'],
+            "medal": row['Medal'] if row['Medal'] != 'No Medal' else None
+        })
+    
+    # Ordenar participações por ano
+    participations.sort(key=lambda x: x['year'])
+    
+    # Contar medalhas
+    medals = athlete_data[athlete_data['Medal'] != 'No Medal']['Medal'].value_counts().to_dict()
+    
+    # Coletar esportes únicos
+    sports = athlete_data['Sport'].unique().tolist()
+    
+    # Anos de participação
+    years = sorted(athlete_data['Year'].unique().tolist())
+    
+    return {
+        "id": athlete_id,
+        "name": latest['Name'],
+        "sex": latest['Sex'],
+        "noc": latest['NOC'],
+        "team": latest['Team'] if pd.notna(latest['Team']) else latest['NOC'],
+        "height": float(latest['Height']) if pd.notna(latest['Height']) else None,
+        "weight": float(latest['Weight']) if pd.notna(latest['Weight']) else None,
+        "age_range": {
+            "min": int(athlete_data['Age'].min()) if pd.notna(athlete_data['Age'].min()) else None,
+            "max": int(athlete_data['Age'].max()) if pd.notna(athlete_data['Age'].max()) else None
+        },
+        "sports": sports,
+        "years": years,
+        "medals": {
+            "gold": int(medals.get('Gold', 0)),
+            "silver": int(medals.get('Silver', 0)),
+            "bronze": int(medals.get('Bronze', 0)),
+            "total": sum(medals.values())
+        },
+        "participations": participations
+    }
+
+
+@router.get("/athletes/{athlete_id}/stats")
+def get_athlete_stats(athlete_id: int):
+    """Retorna estatísticas para os gráficos de um atleta específico"""
+    df = data_loader.get_df()
+    
+    athlete_data = df[df['ID'] == athlete_id]
+    
+    if athlete_data.empty:
+        return {"error": "Atleta não encontrado"}
+    
+    # Evolução de medalhas por ano
+    evolution = []
+    for year in sorted(athlete_data['Year'].unique()):
+        year_data = athlete_data[athlete_data['Year'] == year]
+        medals = year_data[year_data['Medal'] != 'No Medal']['Medal'].value_counts().to_dict()
+        evolution.append({
+            "Year": int(year),
+            "Gold": int(medals.get('Gold', 0)),
+            "Silver": int(medals.get('Silver', 0)),
+            "Bronze": int(medals.get('Bronze', 0)),
+            "Total": sum(medals.values()),
+            "Events": len(year_data)
+        })
+    
+    # Biometria (dados do atleta)
+    latest = athlete_data.sort_values('Year', ascending=False).iloc[0]
+    biometrics = {
+        "height": float(latest['Height']) if pd.notna(latest['Height']) else None,
+        "weight": float(latest['Weight']) if pd.notna(latest['Weight']) else None,
+        "sex": latest['Sex']
+    }
+    
+    # Medalhas por esporte
+    medals_by_sport = []
+    for sport in athlete_data['Sport'].unique():
+        sport_data = athlete_data[athlete_data['Sport'] == sport]
+        medals = sport_data[sport_data['Medal'] != 'No Medal']['Medal'].value_counts().to_dict()
+        medals_by_sport.append({
+            "name": sport,
+            "code": sport,
+            "gold": int(medals.get('Gold', 0)),
+            "silver": int(medals.get('Silver', 0)),
+            "bronze": int(medals.get('Bronze', 0)),
+            "total": sum(medals.values())
+        })
+    
+    # Ordenar por total de medalhas
+    medals_by_sport.sort(key=lambda x: x['total'], reverse=True)
+    
+    return {
+        "evolution": evolution,
+        "biometrics": biometrics,
+        "medals_by_sport": medals_by_sport
+    }

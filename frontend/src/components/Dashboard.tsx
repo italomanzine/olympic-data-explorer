@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo, useCallback, useTransition } from "react";
-import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, FilterState, MedalStat } from "../lib/api";
+import React, { useEffect, useState, useRef, useMemo, useTransition } from "react";
+import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, FilterState, MedalStat, AthleteSearchResult, AthleteProfile, AthleteStats, fetchAthleteProfile, fetchAthleteStats } from "../lib/api";
 import WorldMap from "./charts/WorldMap";
 import BiometricsChart from "./charts/BiometricsChart";
 import EvolutionChart from "./charts/EvolutionChart";
@@ -9,8 +9,10 @@ import MedalTable from "./MedalTable";
 import RangeSlider from "./ui/RangeSlider";
 import SearchableSelect from "./ui/SearchableSelect";
 import LanguageSelector from "./ui/LanguageSelector";
+import AthleteSearch from "./ui/AthleteSearch";
+import AthleteProfileCard from "./AthleteProfileCard";
 import { useLanguage } from "../contexts/LanguageContext";
-import { Loader2, AlertCircle, Play, Pause, Menu, Settings2, Globe } from "lucide-react";
+import { Loader2, AlertCircle, Play, Pause, Menu, Settings2, Globe, User } from "lucide-react";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -72,11 +74,38 @@ export default function Dashboard() {
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false); // Referência para evitar avançar durante carregamento
 
+  // Estados para busca de atleta
+  const [selectedAthlete, setSelectedAthlete] = useState<AthleteSearchResult | null>(null);
+  const [athleteProfile, setAthleteProfile] = useState<AthleteProfile | null>(null);
+  const [athleteStats, setAthleteStats] = useState<AthleteStats | null>(null);
+
   const [mapData, setMapData] = useState([]);
   const [biometricsData, setBiometricsData] = useState([]);
   const [evolutionData, setEvolutionData] = useState([]);
   const [medalTableData, setMedalTableData] = useState<MedalStat[]>([]); 
   const [error, setError] = useState<string | null>(null);
+
+  // Carregar dados do atleta quando selecionado
+  useEffect(() => {
+    if (selectedAthlete) {
+      setLoading(true);
+      Promise.all([
+        fetchAthleteProfile(selectedAthlete.id),
+        fetchAthleteStats(selectedAthlete.id)
+      ]).then(([profile, stats]) => {
+        setAthleteProfile(profile);
+        setAthleteStats(stats);
+        setLoading(false);
+      }).catch(err => {
+        console.error('Erro ao carregar atleta:', err);
+        setError('Erro ao carregar dados do atleta');
+        setLoading(false);
+      });
+    } else {
+      setAthleteProfile(null);
+      setAthleteStats(null);
+    }
+  }, [selectedAthlete]);
 
   useEffect(() => {
     async function init() {
@@ -346,6 +375,23 @@ export default function Dashboard() {
               icon={<Settings2 className="w-4 h-4" />}
             />
           </div>
+
+          {/* Buscar Atleta */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 block">
+              <User className="w-3 h-3 inline mr-1" />
+              {t('athlete')}
+            </label>
+            <AthleteSearch 
+              onSelect={(athlete) => setSelectedAthlete(athlete)}
+              selectedAthlete={selectedAthlete}
+            />
+            {selectedAthlete && (
+              <p className="text-[10px] text-olympic-gold mt-1 px-1">
+                ✨ {t('athlete_profile')} ativo
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-4">
@@ -434,9 +480,20 @@ export default function Dashboard() {
 
               </div>
 
-              {/* Coluna Direita (Quadro de Medalhas) */}
-              <div className="flex-1 xl:max-w-[400px] flex flex-col">
-                 <div className="sticky top-6 h-full">
+              {/* Coluna Direita (Quadro de Medalhas / Perfil do Atleta) */}
+              <div className="flex-1 xl:max-w-[400px] flex flex-col gap-6">
+                 {/* Perfil do Atleta - aparece quando selecionado */}
+                 {selectedAthlete && athleteProfile && (
+                   <div className="sticky top-6">
+                     <AthleteProfileCard 
+                       profile={athleteProfile}
+                       onClose={() => setSelectedAthlete(null)}
+                     />
+                   </div>
+                 )}
+                 
+                 {/* Quadro de Medalhas - sempre aparece, mas fica abaixo do perfil se houver atleta */}
+                 <div className={selectedAthlete ? '' : 'sticky top-6 h-full'}>
                     <MedalTable 
                         data={medalTableData} 
                         title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')} 

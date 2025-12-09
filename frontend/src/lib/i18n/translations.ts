@@ -56,6 +56,17 @@ export const translations: Record<Language, Record<string, string>> = {
     other_athletes: "outros atletas...",
     weight: "Peso",
     height: "Altura",
+    
+    // Busca de Atleta
+    athlete: "Atleta",
+    search_athlete: "Buscar atleta por nome...",
+    no_athletes_found: "Nenhum atleta encontrado",
+    clear_athlete: "Limpar seleção",
+    sports_practiced: "Modalidades",
+    olympic_participations: "Participações Olímpicas",
+    athlete_profile: "Perfil do Atleta",
+    athlete_evolution: "Evolução do Atleta",
+    athlete_medals: "Medalhas do Atleta",
   },
   'en': {
     app_title: "Olympic Dashboard",
@@ -99,6 +110,17 @@ export const translations: Record<Language, Record<string, string>> = {
     other_athletes: "other athletes...",
     weight: "Weight",
     height: "Height",
+    
+    // Athlete Search
+    athlete: "Athlete",
+    search_athlete: "Search athlete by name...",
+    no_athletes_found: "No athlete found",
+    clear_athlete: "Clear selection",
+    sports_practiced: "Sports",
+    olympic_participations: "Olympic Participations",
+    athlete_profile: "Athlete Profile",
+    athlete_evolution: "Athlete Evolution",
+    athlete_medals: "Athlete Medals",
   },
   'es': {
     app_title: "Tablero Olímpico",
@@ -142,6 +164,17 @@ export const translations: Record<Language, Record<string, string>> = {
     other_athletes: "otros atletas...",
     weight: "Peso",
     height: "Altura",
+    
+    // Búsqueda de Atleta
+    athlete: "Atleta",
+    search_athlete: "Buscar atleta por nombre...",
+    no_athletes_found: "Ningún atleta encontrado",
+    clear_athlete: "Limpiar selección",
+    sports_practiced: "Deportes",
+    olympic_participations: "Participaciones Olímpicas",
+    athlete_profile: "Perfil del Atleta",
+    athlete_evolution: "Evolución del Atleta",
+    athlete_medals: "Medallas del Atleta",
   },
   'fr': {
     app_title: "Tableau de Bord Olympique",
@@ -185,6 +218,17 @@ export const translations: Record<Language, Record<string, string>> = {
     other_athletes: "autres athlètes...",
     weight: "Poids",
     height: "Taille",
+    
+    // Recherche d'Athlète
+    athlete: "Athlète",
+    search_athlete: "Rechercher un athlète...",
+    no_athletes_found: "Aucun athlète trouvé",
+    clear_athlete: "Effacer la sélection",
+    sports_practiced: "Sports",
+    olympic_participations: "Participations Olympiques",
+    athlete_profile: "Profil de l'Athlète",
+    athlete_evolution: "Évolution de l'Athlète",
+    athlete_medals: "Médailles de l'Athlète",
   },
   'zh': {
     app_title: "奥运仪表板",
@@ -228,6 +272,17 @@ export const translations: Record<Language, Record<string, string>> = {
     other_athletes: "其他运动员...",
     weight: "重量",
     height: "身高",
+    
+    // 运动员搜索
+    athlete: "运动员",
+    search_athlete: "搜索运动员...",
+    no_athletes_found: "未找到运动员",
+    clear_athlete: "清除选择",
+    sports_practiced: "运动项目",
+    olympic_participations: "奥运参赛",
+    athlete_profile: "运动员档案",
+    athlete_evolution: "运动员发展",
+    athlete_medals: "运动员奖牌",
   }
 };
 
