@@ -177,7 +177,7 @@ function BiometricsChart({ data }: BiometricsChartProps) {
               position: "insideLeft",
               fill: "#94A3B8",
               style: { textAnchor: "middle" },
-              offset: 0,
+              offset: -10,
             }}
           />
           <ZAxis
