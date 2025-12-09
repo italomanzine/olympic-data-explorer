@@ -12,7 +12,7 @@ import LanguageSelector from "./ui/LanguageSelector";
 import AthleteSearch from "./ui/AthleteSearch";
 import AthleteProfileCard from "./AthleteProfileCard";
 import { useLanguage } from "../contexts/LanguageContext";
-import { Loader2, AlertCircle, Play, Pause, Menu, Settings2, Globe, User } from "lucide-react";
+import { Loader2, AlertCircle, Play, Pause, Menu, Settings2, Globe, User, ChevronUp, ChevronDown } from "lucide-react";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -71,6 +71,7 @@ export default function Dashboard() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(2000); // Velocidade da animação em ms
+  const [timelineExpanded, setTimelineExpanded] = useState(true); // Estado para expandir/recolher timeline
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef(false); // Referência para evitar avançar durante carregamento
 
@@ -506,36 +507,53 @@ export default function Dashboard() {
         </div>
 
         {/* Timeline Bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-30 transition-transform duration-300">
-          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center gap-4 sm:gap-8">
-            <div className="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
-              <button 
-                onClick={() => setIsPlaying(!isPlaying)}
-                disabled={loading && isPlaying}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 disabled:opacity-50 ${
-                  isPlaying 
-                    ? "bg-amber-400 text-white hover:bg-amber-500 ring-4 ring-amber-100" 
-                    : "bg-slate-800 text-white hover:bg-slate-700 ring-4 ring-slate-100"
-                }`}
-              >
-                {loading && isPlaying ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : isPlaying ? (
-                  <Pause className="fill-current w-5 h-5" />
-                ) : (
-                  <Play className="fill-current w-5 h-5 ml-1" />
-                )}
-              </button>
-              
-              <div className="flex flex-col">
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('edition')}</span>
-                 <span className="text-lg font-bold text-slate-800 leading-none whitespace-nowrap">
-                    {getYearLabel(filters.year || 2016)}
-                 </span>
+        <div className={`fixed bottom-0 left-0 lg:left-72 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] z-30 transition-all duration-300 ${timelineExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-32px)]'}`}>
+          {/* Toggle Button */}
+          <button
+            onClick={() => setTimelineExpanded(!timelineExpanded)}
+            className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-6 bg-white border border-slate-200 border-b-0 rounded-t-md flex items-center justify-center hover:bg-slate-50 transition-colors z-10"
+            title={timelineExpanded ? 'Recolher timeline' : 'Expandir timeline'}
+          >
+            {timelineExpanded ? (
+              <ChevronDown className="w-4 h-4 text-slate-500" />
+            ) : (
+              <ChevronUp className="w-4 h-4 text-slate-500" />
+            )}
+          </button>
+
+          {/* Timeline Content */}
+          <div className="p-4">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              {/* Play/Pause + Info */}
+              <div className="flex items-center gap-4 shrink-0">
+                <button 
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  disabled={loading && isPlaying}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95 disabled:opacity-50 shrink-0 ${
+                    isPlaying 
+                      ? "bg-amber-400 text-white hover:bg-amber-500 ring-4 ring-amber-100" 
+                      : "bg-slate-800 text-white hover:bg-slate-700 ring-4 ring-slate-100"
+                  }`}
+                >
+                  {loading && isPlaying ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="fill-current w-5 h-5" />
+                  ) : (
+                    <Play className="fill-current w-5 h-5 ml-1" />
+                  )}
+                </button>
+                
+                <div className="flex flex-col min-w-[120px]">
+                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('edition')}</span>
+                   <span className="text-lg font-bold text-slate-800 leading-none whitespace-nowrap">
+                      {getYearLabel(filters.year || 2016)}
+                   </span>
+                </div>
               </div>
 
               {/* Controle de velocidade */}
-              <div className="hidden sm:flex items-center gap-2 ml-2 pl-4 border-l border-slate-200">
+              <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-slate-200 shrink-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vel:</span>
                 <div className="flex gap-1">
                   {[
@@ -557,20 +575,21 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
-            </div>
 
-            <div className="flex-1 w-full px-2">
-               <RangeSlider 
-                 min={filteredYears[0] || 1896} 
-                 max={filteredYears[filteredYears.length - 1] || 2016} 
-                 value={filters.year || 2016}
-                 onChange={(val) => {
-                   const closest = filteredYears.reduce((prev, curr) => 
-                     Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev
-                   , filteredYears[0]);
-                   setFilters(prev => ({ ...prev, year: closest }));
-                 }}
-               />
+              {/* Slider */}
+              <div className="flex-1 w-full min-w-0">
+                 <RangeSlider 
+                   min={filteredYears[0] || 1896} 
+                   max={filteredYears[filteredYears.length - 1] || 2016} 
+                   value={filters.year || 2016}
+                   onChange={(val) => {
+                     const closest = filteredYears.reduce((prev, curr) => 
+                       Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev
+                     , filteredYears[0]);
+                     setFilters(prev => ({ ...prev, year: closest }));
+                   }}
+                 />
+              </div>
             </div>
           </div>
         </div>
