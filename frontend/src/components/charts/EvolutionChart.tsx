@@ -39,7 +39,8 @@ const COUNTRY_NOTES: Record<string, string> = {
   'ROC': 'Comitê Olímpico Russo',
 };
 
-const CustomTooltip = memo(({ active, payload, label }: any) => {
+// Exported for testing
+export const CustomTooltip = memo(({ active, payload, label }: any) => {
   const { t } = useLanguage();
   
   if (active && payload && payload.length) {
@@ -70,8 +71,8 @@ const CustomTooltip = memo(({ active, payload, label }: any) => {
 
 CustomTooltip.displayName = 'CustomTooltip';
 
-// Componente de legenda customizado
-const CustomLegend = memo(({ payload, hiddenKeys, toggleKey }: any) => {
+// Exported for testing
+export const CustomLegend = memo(({ payload, hiddenKeys, toggleKey }: any) => {
   return (
     <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-2 py-1">
       {payload?.map((entry: any, index: number) => {

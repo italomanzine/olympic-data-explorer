@@ -22,7 +22,7 @@ interface WorldMapProps {
 }
 
 // Função para calcular posição do tooltip evitando sair da tela
-function calculateTooltipPosition(
+export function calculateTooltipPosition(
   mouseX: number, 
   mouseY: number, 
   tooltipWidth: number = 160, 

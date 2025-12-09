@@ -1,31 +1,71 @@
+# ======================
 # OS
+# ======================
 .DS_Store
 .thumbs.db
+Thumbs.db
 
-# IDE
+# ======================
+# IDE / Editor
+# ======================
 .vscode/
 .idea/
 .cursor/
 *.swp
+*.swo
+*~
 
+# ======================
 # Python / Backend
+# ======================
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
 venv/
 .venv/
 env/
+ENV/
 backend/venv/
 backend/.venv/
+
+# Testing
 .pytest_cache/
 backend/.pytest_cache/
+.coverage
+backend/.coverage
+htmlcov/
+backend/htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
 
-# Python data (Datasets grandes não devem ir para o git)
-#backend/data/*.csv
+# Distribution / Packaging
+.eggs/
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Datasets (large files)
 backend/data/*.zip
 *.sqlite3
 
+# Jupyter (if used)
+.ipynb_checkpoints/
+
+# MyPy
+.mypy_cache/
+
+# ======================
 # Node / Frontend
+# ======================
 node_modules/
 frontend/node_modules/
 .next/
@@ -36,8 +76,21 @@ build/
 frontend/build/
 dist/
 frontend/dist/
+.swc/
+frontend/.swc/
 
-# Environment variables
+# Testing
+coverage/
+frontend/coverage/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+frontend/*.tsbuildinfo
+
+# ======================
+# Environment Variables
+# ======================
 .env
 .env.local
 .env.development.local
@@ -46,9 +99,17 @@ frontend/dist/
 frontend/.env*
 backend/.env*
 
+# ======================
 # Logs
+# ======================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
 
+# ======================
+# Misc
+# ======================
+*.pem
+.vercel

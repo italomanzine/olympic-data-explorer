@@ -1,7 +1,23 @@
+# ======================
+# Web Framework
+# ======================
 fastapi>=0.109.0
-uvicorn>=0.27.0
-pandas>=2.2.0
-python-multipart
-pytest
-httpx
+uvicorn[standard]>=0.27.0
 
+# ======================
+# Data Processing
+# ======================
+pandas>=2.2.0
+numpy>=1.26.0
+
+# ======================
+# API Utils
+# ======================
+python-multipart>=0.0.6
+
+# ======================
+# Testing
+# ======================
+pytest>=8.0.0
+pytest-cov>=4.1.0
+httpx>=0.27.0

@@ -36,7 +36,8 @@ interface GroupedBiometricData {
   Athletes: BiometricData[];
 }
 
-const CustomTooltip = memo(({ active, payload }: any) => {
+// Exported for testing
+export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
 
   if (active && payload && payload.length) {

@@ -35,8 +35,9 @@ const MEDAL_COLORS = {
   total: "#3B82F6",
 };
 
+// Exported for testing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = memo(({ active, payload }: any) => {
+export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
 
   if (active && payload && payload.length) {

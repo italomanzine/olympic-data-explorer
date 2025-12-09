@@ -266,9 +266,8 @@ def get_top_athletes(
     # Aplicar filtro de tipo de medalha se especificado
     if medal_type and medal_type != "Total":
         medals_only = medals_only[medals_only['Medal'] == medal_type]
-    
-    if medals_only.empty:
-        return []
+        if medals_only.empty:
+            return []
     
     # Deduplicar por evento (uma medalha por evento para times)
     medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'ID', 'Event', 'Medal'])
@@ -284,9 +283,11 @@ def get_top_athletes(
     athlete_medals['Total'] = athlete_medals[desired_cols].sum(axis=1)
     
     # Ordenar por total de medalhas (ou por tipo específico se filtrado)
+    # Nota: sort_col sempre estará em athlete_medals.columns porque:
+    # 1. Se medal_type é Gold/Silver/Bronze: garantido por desired_cols
+    # 2. Se medal_type é Total ou None: sort_col = 'Total' (adicionado acima)
+    # 3. Se medal_type é outro valor: filtro anterior retorna vazio
     sort_col = medal_type if medal_type and medal_type != "Total" else 'Total'
-    if sort_col not in athlete_medals.columns:
-        sort_col = 'Total'
     
     athlete_medals = athlete_medals.sort_values(by=sort_col, ascending=False).head(limit)
     
