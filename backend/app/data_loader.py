@@ -1,90 +1,113 @@
 import pandas as pd
-import numpy as np
+import sqlite3
 import os
+import contextlib
+from typing import Optional, List
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/athlete_events.csv")
-
-def generate_mock_data(rows=1000):
-    """Gera dados falsos para teste caso o CSV não exista."""
-    years = range(1896, 2016, 4)
-    sports = ["Basketball", "Judo", "Football", "Swimming", "Athletics", "Gymnastics"]
-    countries = ["USA", "CHN", "BRA", "FRA", "GBR", "JPN"]
-    
-    data = {
-        "ID": range(1, rows + 1),
-        "Name": [f"Athlete {i}" for i in range(rows)],
-        "Sex": np.random.choice(["M", "F"], rows),
-        "Age": np.random.randint(18, 40, rows),
-        "Height": np.random.randint(150, 210, rows),
-        "Weight": np.random.randint(45, 120, rows),
-        "Team": np.random.choice(countries, rows),
-        "NOC": np.random.choice(countries, rows),
-        "Year": np.random.choice(years, rows),
-        "Season": "Summer",
-        "City": "City",
-        "Sport": np.random.choice(sports, rows),
-        "Event": "Event",
-        "Medal": np.random.choice(["Gold", "Silver", "Bronze", "NA"], rows, p=[0.05, 0.05, 0.05, 0.85])
-    }
-    
-    return pd.DataFrame(data)
+# Caminhos
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "data", "olympics.db")
 
 class DataLoader:
     _instance = None
-    _df = None
-
+    
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DataLoader, cls).__new__(cls)
         return cls._instance
 
-    def load_data(self):
-        if self._df is not None:
-            return self._df
+    def get_connection(self):
+        """Retorna uma conexão crua (Cuidado: deve ser fechada manualmente)."""
+        if not os.path.exists(DB_PATH):
+            raise FileNotFoundError(f"Banco de dados não encontrado em {DB_PATH}. Execute scripts/convert_to_sqlite.py primeiro.")
+        return sqlite3.connect(DB_PATH)
 
-        if os.path.exists(DATA_PATH):
-            print(f"Carregando dados de {DATA_PATH}...")
-            # Tenta lista de encodings possíveis
-            encodings_to_try = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']
-            
-            for encoding in encodings_to_try:
-                try:
-                    print(f"Tentando ler com encoding: {encoding}...")
-                    self._df = pd.read_csv(DATA_PATH, encoding=encoding)
-                    print(f"Sucesso com {encoding}!")
-                    break
-                except UnicodeDecodeError:
-                    continue
-            
-            # Se nenhum funcionou, tenta latin-1 ignorando erros (fallback)
-            if self._df is None:
-                print("Todos encodings falharam. Forçando latin-1 com replace.")
-                self._df = pd.read_csv(DATA_PATH, encoding='latin-1', encoding_errors='replace')
+    @contextlib.contextmanager
+    def get_connection_context(self):
+        """Context manager que garante o fechamento da conexão."""
+        conn = self.get_connection()
+        try:
+            yield conn
+        finally:
+            conn.close()
 
-        else:
-            print("Arquivo CSV não encontrado. Gerando dados de MOCK...")
-            self._df = generate_mock_data()
+    def query_filtered(
+        self, 
+        year: Optional[int] = None, 
+        season: Optional[str] = None, 
+        sex: Optional[str] = None, 
+        country: Optional[str] = None, 
+        sport: Optional[str] = None, 
+        start_year: Optional[int] = None, 
+        end_year: Optional[int] = None,
+        countries: Optional[List[str]] = None
+    ) -> pd.DataFrame:
+        query = "SELECT * FROM athletes WHERE 1=1"
+        params = []
+
+        if year:
+            query += " AND Year = ?"
+            params.append(year)
         
-        # --- LIMPEZA E CORREÇÕES ---
-        
-        if 'Sex' in self._df.columns:
-            self._df['Sex'] = self._df['Sex'].astype(str).str.strip()
-            
-        self._df['Medal'] = self._df['Medal'].fillna('No Medal')
-        
-        if 'Name' in self._df.columns:
-            # Correção específica solicitada (Patch de dados)
-            # Se o nome começa com "talo Manzine", corrige para "Ítalo Manzine"
-            self._df['Name'] = self._df['Name'].str.replace(r'^talo Manzine', 'Ítalo Manzine', regex=True)
-            
-            # Remove espaços extras nos nomes em geral
-            self._df['Name'] = self._df['Name'].str.strip()
+        if start_year is not None and end_year is not None:
+            query += " AND Year >= ? AND Year <= ?"
+            params.extend([start_year, end_year])
 
-        return self._df
+        if season and season != "Both":
+            query += " AND Season = ?"
+            params.append(season)
+            
+        if sex and sex != "Both":
+            query += " AND Sex = ?"
+            params.append(sex)
+            
+        if country and country != "All":
+            query += " AND NOC = ?"
+            params.append(country)
+        
+        if countries:
+            placeholders = ','.join(['?'] * len(countries))
+            query += f" AND NOC IN ({placeholders})"
+            params.extend(countries)
+            
+        if sport and sport != "All":
+            query += " AND Sport = ?"
+            params.append(sport)
+            
+        try:
+            with self.get_connection_context() as conn:
+                return pd.read_sql_query(query, conn, params=params)
+        except Exception as e:
+            print(f"Erro ao executar query: {e}")
+            return pd.DataFrame() 
 
-    def get_df(self):
-        if self._df is None:
-            self.load_data()
-        return self._df
+    def get_unique_values(self, column: str) -> List:
+        try:
+            with self.get_connection_context() as conn:
+                query = f"SELECT DISTINCT {column} FROM athletes ORDER BY {column}"
+                cursor = conn.cursor()
+                cursor.execute(query)
+                return [row[0] for row in cursor.fetchall()]
+        except Exception:
+            return []
+
+    def get_year_season_map(self):
+        try:
+            with self.get_connection_context() as conn:
+                query = "SELECT DISTINCT Year, Season FROM athletes"
+                df = pd.read_sql_query(query, conn)
+                return df.groupby('Year')['Season'].unique().apply(list).to_dict()
+        except Exception:
+            return {}
+
+    def get_noc_map(self):
+        try:
+            with self.get_connection_context() as conn:
+                query = "SELECT DISTINCT NOC, Team FROM athletes"
+                df = pd.read_sql_query(query, conn)
+                df['Team'] = df['Team'].str.replace(r'-\d+$', '', regex=True)
+                return df.groupby('NOC')['Team'].first().to_dict()
+        except Exception:
+            return {}
 
 data_loader = DataLoader()
