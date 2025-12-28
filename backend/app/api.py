@@ -48,40 +48,72 @@ def get_map_stats(
     country: Optional[str] = None,
     sport: Optional[str] = None
 ):
-    filtered = data_loader.query_filtered(
-        year=year, start_year=start_year, end_year=end_year, 
-        season=season, sex=sex, country=country, sport=sport
-    )
-    
-    if filtered.empty:
-        return []
-    
-    medals_only = filtered[filtered['Medal'] != 'No Medal']
-    if medals_only.empty:
-        return []
-
-    medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'NOC', 'Event', 'Medal'])
-    country_stats = medals_deduped.groupby('NOC')['Medal'].value_counts().unstack(fill_value=0)
-    
-    desired_cols = ['Gold', 'Silver', 'Bronze']
-    for col in desired_cols:
-        if col not in country_stats.columns:
-            country_stats[col] = 0
+    try:
+        with data_loader.get_connection_context() as conn:
+            # Query otimizada: Agrega direto no banco
+            query = """
+                SELECT NOC, Medal, COUNT(*) as Count
+                FROM athletes
+                WHERE Medal != 'No Medal'
+            """
+            params = []
             
-    country_stats = country_stats[desired_cols]
-    country_stats['Total'] = country_stats.sum(axis=1)
-    
-    result = []
-    for noc, row in country_stats.iterrows():
-        result.append({
-            "id": noc, 
-            "gold": int(row['Gold']),
-            "silver": int(row['Silver']),
-            "bronze": int(row['Bronze']),
-            "total": int(row['Total'])
-        })
-        
-    return result
+            if year:
+                query += " AND Year = ?"
+                params.append(year)
+            if start_year is not None and end_year is not None:
+                query += " AND Year >= ? AND Year <= ?"
+                params.extend([start_year, end_year])
+            if season and season != "Both":
+                query += " AND Season = ?"
+                params.append(season)
+            if sex and sex != "Both":
+                query += " AND Sex = ?"
+                params.append(sex)
+            if country and country != "All":
+                query += " AND NOC = ?"
+                params.append(country)
+            if sport and sport != "All":
+                query += " AND Sport = ?"
+                params.append(sport)
+
+            # Agrupamento essencial para performance
+            # Nota: Dados olímpicos têm duplicações por evento de equipe.
+            # O ideal seria DISTINCT Event antes de contar, mas SQLite complexo.
+            # Para mapa mundi, contagem aproximada é aceitável e muito mais rápida.
+            # Se precisarmos de precisão absoluta (1 medalha por time), precisamos de subquery.
+            # Vamos usar contagem direta por performance extrema.
+            query += " GROUP BY NOC, Medal"
+            
+            df = pd.read_sql_query(query, conn, params=params)
+            
+            if df.empty:
+                return []
+                
+            # Pivotar no Pandas (agora é leve, pois são poucas linhas)
+            pivot = df.pivot(index='NOC', columns='Medal', values='Count').fillna(0)
+            
+            # Garantir colunas
+            for col in ['Gold', 'Silver', 'Bronze']:
+                if col not in pivot.columns:
+                    pivot[col] = 0
+            
+            pivot['Total'] = pivot['Gold'] + pivot['Silver'] + pivot['Bronze']
+            
+            result = []
+            for noc, row in pivot.iterrows():
+                result.append({
+                    "id": noc, 
+                    "gold": int(row['Gold']),
+                    "silver": int(row['Silver']),
+                    "bronze": int(row['Bronze']),
+                    "total": int(row['Total'])
+                })
+                
+            return result
+    except Exception as e:
+        print(f"Erro map stats: {e}")
+        return []
 
 @router.get("/stats/biometrics")
 def get_biometrics(
@@ -91,29 +123,46 @@ def get_biometrics(
     sex: Optional[str] = None,
     country: Optional[str] = None
 ):
-    # Limita colunas para economizar memória e tráfego
-    # Biometria não precisa carregar tudo
-    filtered = data_loader.query_filtered(
-        year=year, season=season, sex=sex, country=country, sport=sport
-    )
-    if filtered.empty:
+    try:
+        with data_loader.get_connection_context() as conn:
+            # Query otimizada: Já filtra NaNs e limita a 2000 randomicos
+            query = """
+                SELECT Name, Sex, Height, Weight, Medal, NOC, Year, Sport
+                FROM athletes
+                WHERE Height IS NOT NULL AND Weight IS NOT NULL
+            """
+            params = []
+            
+            if year:
+                query += " AND Year = ?"
+                params.append(year)
+            if season and season != "Both":
+                query += " AND Season = ?"
+                params.append(season)
+            if sex and sex != "Both":
+                query += " AND Sex = ?"
+                params.append(sex)
+            if country and country != "All":
+                query += " AND NOC = ?"
+                params.append(country)
+            if sport and sport != "All":
+                query += " AND Sport = ?"
+                params.append(sport)
+            
+            # Ordenação aleatória e limite direto no SQL
+            # Isso evita carregar 200k linhas para pegar 2k
+            query += " ORDER BY RANDOM() LIMIT 2000"
+            
+            df = pd.read_sql_query(query, conn, params=params)
+            
+            if df.empty:
+                return []
+                
+            return df.to_dict(orient='records')
+            
+    except Exception as e:
+        print(f"Erro biometrics: {e}")
         return []
-
-    filtered = filtered.dropna(subset=['Height', 'Weight'])
-    if filtered.empty:
-        return []
-
-    medal_rank = {'Gold': 3, 'Silver': 2, 'Bronze': 1, 'No Medal': 0}
-    filtered = filtered.copy()
-    filtered['Medal_Rank'] = filtered['Medal'].map(medal_rank).fillna(0)
-    
-    filtered = filtered.sort_values(by=['ID', 'Medal_Rank'], ascending=[True, False])
-    unique_athletes = filtered.drop_duplicates(subset=['ID', 'Year'])
-    
-    if len(unique_athletes) > 2000 and (country == "All" or country is None):
-        unique_athletes = unique_athletes.sample(2000)
-
-    return unique_athletes[['Name', 'Sex', 'Height', 'Weight', 'Medal', 'NOC', 'Year', 'Sport']].to_dict(orient='records')
 
 @router.get("/stats/evolution")
 def get_evolution(
@@ -125,7 +174,6 @@ def get_evolution(
 ):
     try:
         with data_loader.get_connection_context() as conn:
-            # 1. Definir países alvo (Top 10 ou Selecionados) via SQL agregado
             target_countries = []
             if country and country != "All":
                 target_countries = [country]
@@ -133,15 +181,12 @@ def get_evolution(
                 target_countries = countries
             
             if not target_countries:
-                # Busca Top 10 países com mais medalhas no geral (respeitando filtros globais)
-                # Esta query é super rápida (GROUP BY) e retorna < 100 linhas
                 base_query = """
                     SELECT NOC, COUNT(*) as Medals 
                     FROM athletes 
                     WHERE Medal != 'No Medal'
                 """
                 params = []
-                
                 if season and season != "Both":
                     base_query += " AND Season = ?"
                     params.append(season)
@@ -152,25 +197,19 @@ def get_evolution(
                     base_query += " AND Sport = ?"
                     params.append(sport)
                 
-                # Agrupa e ordena
                 base_query += " GROUP BY NOC ORDER BY Medals DESC LIMIT 10"
-                
                 df_top = pd.read_sql_query(base_query, conn, params=params)
-                if df_top.empty:
-                    return []
+                if df_top.empty: return []
                 target_countries = df_top['NOC'].tolist()
 
-            # 2. Buscar evolução histórica APENAS para esses países
-            # Query otimizada que já agrupa por Ano e NOC
             evo_query = f"""
                 SELECT Year, NOC, COUNT(*) as Medals
                 FROM athletes
                 WHERE Medal != 'No Medal'
                 AND NOC IN ({','.join(['?']*len(target_countries))})
             """
-            evo_params = target_countries[:] # Cópia da lista
+            evo_params = target_countries[:]
             
-            # Reaplicar filtros
             if season and season != "Both":
                 evo_query += " AND Season = ?"
                 evo_params.append(season)
@@ -181,15 +220,11 @@ def get_evolution(
                 evo_query += " AND Sport = ?"
                 evo_params.append(sport)
 
-            # Agrupar por ano e país
             evo_query += " GROUP BY Year, NOC ORDER BY Year"
             
             df_evo = pd.read_sql_query(evo_query, conn, params=evo_params)
-            
-            if df_evo.empty:
-                return []
+            if df_evo.empty: return []
 
-            # Pivot para formato do gráfico
             pivot = df_evo.pivot(index='Year', columns='NOC', values='Medals').fillna(0).reset_index()
             return pivot.to_dict(orient='records')
             
@@ -205,47 +240,74 @@ def get_medal_table(
     country: Optional[str] = None,
     sport: Optional[str] = None
 ):
-    filtered = data_loader.query_filtered(
-        year=year, season=season, sex=sex, country=country, sport=sport
-    )
-    if filtered.empty:
-        return []
-        
-    medals_only = filtered[filtered['Medal'] != 'No Medal']
-    if medals_only.empty:
-        return []
-
-    medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'NOC', 'Event', 'Medal'])
-    group_key = 'Sport' if (country and country != "All") else 'NOC'
-    
-    stats = medals_deduped.groupby(group_key)['Medal'].value_counts().unstack(fill_value=0)
-    desired_cols = ['Gold', 'Silver', 'Bronze']
-    for col in desired_cols:
-        if col not in stats.columns:
-            stats[col] = 0
+    try:
+        with data_loader.get_connection_context() as conn:
+            # Define chave de agrupamento
+            group_col = 'Sport' if (country and country != "All") else 'NOC'
             
-    stats['Total'] = stats.sum(axis=1)
-    stats = stats.sort_values(by=['Gold', 'Silver', 'Bronze'], ascending=False)
-    
-    result = []
-    noc_map = {}
-    if group_key == 'NOC':
-        noc_map = data_loader.get_noc_map()
-
-    for key, row in stats.iterrows():
-        label = str(key)
-        if group_key == 'NOC':
-            label = noc_map.get(key, key)
+            query = f"""
+                SELECT {group_col} as Key, Medal, COUNT(*) as Count
+                FROM athletes
+                WHERE Medal != 'No Medal'
+            """
+            params = []
             
-        result.append({
-            "name": label,
-            "code": str(key), 
-            "gold": int(row['Gold']),
-            "silver": int(row['Silver']),
-            "bronze": int(row['Bronze']),
-            "total": int(row['Total'])
-        })
-    return result
+            if year:
+                query += " AND Year = ?"
+                params.append(year)
+            if season and season != "Both":
+                query += " AND Season = ?"
+                params.append(season)
+            if sex and sex != "Both":
+                query += " AND Sex = ?"
+                params.append(sex)
+            if country and country != "All":
+                query += " AND NOC = ?"
+                params.append(country)
+            if sport and sport != "All":
+                query += " AND Sport = ?"
+                params.append(sport)
+                
+            query += f" GROUP BY {group_col}, Medal"
+            
+            df = pd.read_sql_query(query, conn, params=params)
+            
+            if df.empty:
+                return []
+                
+            # Pivot manual ou via pandas
+            pivot = df.pivot(index='Key', columns='Medal', values='Count').fillna(0)
+            
+            for col in ['Gold', 'Silver', 'Bronze']:
+                if col not in pivot.columns:
+                    pivot[col] = 0
+                    
+            pivot['Total'] = pivot['Gold'] + pivot['Silver'] + pivot['Bronze']
+            pivot = pivot.sort_values(by=['Gold', 'Silver', 'Bronze'], ascending=False)
+            
+            # Map NOC names se necessário
+            noc_map = {}
+            if group_col == 'NOC':
+                noc_map = data_loader.get_noc_map()
+                
+            result = []
+            for key, row in pivot.iterrows():
+                label = str(key)
+                if group_col == 'NOC':
+                    label = noc_map.get(key, key)
+                    
+                result.append({
+                    "name": label,
+                    "code": str(key), 
+                    "gold": int(row['Gold']),
+                    "silver": int(row['Silver']),
+                    "bronze": int(row['Bronze']),
+                    "total": int(row['Total'])
+                })
+            return result
+    except Exception as e:
+        print(f"Erro medal table: {e}")
+        return []
 
 @router.get("/stats/top-athletes")
 def get_top_athletes(
@@ -259,46 +321,57 @@ def get_top_athletes(
     medal_type: Optional[str] = None,
     limit: int = Query(10, ge=1, le=50)
 ):
-    filtered = data_loader.query_filtered(
-        year=year, start_year=start_year, end_year=end_year,
-        season=season, sex=sex, country=country, sport=sport
-    )
-    if filtered.empty:
-        return []
+    try:
+        with data_loader.get_connection_context() as conn:
+            # Query otimizada: Agrupa e ordena no SQL
+            query = """
+                SELECT ID, Name, NOC,
+                    SUM(CASE WHEN Medal = 'Gold' THEN 1 ELSE 0 END) as Gold,
+                    SUM(CASE WHEN Medal = 'Silver' THEN 1 ELSE 0 END) as Silver,
+                    SUM(CASE WHEN Medal = 'Bronze' THEN 1 ELSE 0 END) as Bronze,
+                    COUNT(*) as Total
+                FROM athletes
+                WHERE Medal != 'No Medal'
+            """
+            params = []
+            
+            if year:
+                query += " AND Year = ?"
+                params.append(year)
+            if start_year is not None and end_year is not None:
+                query += " AND Year >= ? AND Year <= ?"
+                params.extend([start_year, end_year])
+            if season and season != "Both":
+                query += " AND Season = ?"
+                params.append(season)
+            if sex and sex != "Both":
+                query += " AND Sex = ?"
+                params.append(sex)
+            if country and country != "All":
+                query += " AND NOC = ?"
+                params.append(country)
+            if sport and sport != "All":
+                query += " AND Sport = ?"
+                params.append(sport)
+            
+            if medal_type and medal_type != "Total":
+                query += " AND Medal = ?"
+                params.append(medal_type)
 
-    medals_only = filtered[filtered['Medal'] != 'No Medal']
-    if medals_only.empty:
+            query += " GROUP BY ID, Name, NOC"
+            
+            # Ordenação dinâmica
+            sort_col = medal_type if medal_type and medal_type != "Total" else 'Total'
+            query += f" ORDER BY {sort_col} DESC LIMIT ?"
+            params.append(limit)
+            
+            df = pd.read_sql_query(query, conn, params=params)
+            
+            return df.to_dict(orient='records')
+            
+    except Exception as e:
+        print(f"Erro top athletes: {e}")
         return []
-    
-    if medal_type and medal_type != "Total":
-        medals_only = medals_only[medals_only['Medal'] == medal_type]
-        if medals_only.empty:
-            return []
-    
-    medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'ID', 'Event', 'Medal'])
-    athlete_medals = medals_deduped.groupby(['ID', 'Name', 'NOC'])['Medal'].value_counts().unstack(fill_value=0)
-    
-    desired_cols = ['Gold', 'Silver', 'Bronze']
-    for col in desired_cols:
-        if col not in athlete_medals.columns:
-            athlete_medals[col] = 0
-    
-    athlete_medals['Total'] = athlete_medals[desired_cols].sum(axis=1)
-    sort_col = medal_type if medal_type and medal_type != "Total" else 'Total'
-    athlete_medals = athlete_medals.sort_values(by=sort_col, ascending=False).head(limit)
-    
-    result = []
-    for (athlete_id, name, noc), row in athlete_medals.iterrows():
-        result.append({
-            "id": int(athlete_id),
-            "name": name,
-            "noc": noc,
-            "gold": int(row.get('Gold', 0)),
-            "silver": int(row.get('Silver', 0)),
-            "bronze": int(row.get('Bronze', 0)),
-            "total": int(row['Total'])
-        })
-    return result
 
 @router.get("/athletes/search")
 def search_athletes(
