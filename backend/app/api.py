@@ -91,6 +91,8 @@ def get_biometrics(
     sex: Optional[str] = None,
     country: Optional[str] = None
 ):
+    # Limita colunas para economizar memória e tráfego
+    # Biometria não precisa carregar tudo
     filtered = data_loader.query_filtered(
         year=year, season=season, sex=sex, country=country, sport=sport
     )
@@ -121,40 +123,79 @@ def get_evolution(
     country: Optional[str] = None,
     sport: Optional[str] = None 
 ):
-    target_countries = []
-    if country and country != "All":
-        target_countries = [country]
-    elif countries:
-        target_countries = countries
-    
-    if not target_countries:
-        filtered_base = data_loader.query_filtered(season=season, sex=sex, sport=sport)
-        if filtered_base.empty:
-            return []
+    try:
+        with data_loader.get_connection_context() as conn:
+            # 1. Definir países alvo (Top 10 ou Selecionados) via SQL agregado
+            target_countries = []
+            if country and country != "All":
+                target_countries = [country]
+            elif countries:
+                target_countries = countries
             
-        medals_only = filtered_base[filtered_base['Medal'] != 'No Medal']
-        if medals_only.empty:
-            return []
+            if not target_countries:
+                # Busca Top 10 países com mais medalhas no geral (respeitando filtros globais)
+                # Esta query é super rápida (GROUP BY) e retorna < 100 linhas
+                base_query = """
+                    SELECT NOC, COUNT(*) as Medals 
+                    FROM athletes 
+                    WHERE Medal != 'No Medal'
+                """
+                params = []
+                
+                if season and season != "Both":
+                    base_query += " AND Season = ?"
+                    params.append(season)
+                if sex and sex != "Both":
+                    base_query += " AND Sex = ?"
+                    params.append(sex)
+                if sport and sport != "All":
+                    base_query += " AND Sport = ?"
+                    params.append(sport)
+                
+                # Agrupa e ordena
+                base_query += " GROUP BY NOC ORDER BY Medals DESC LIMIT 10"
+                
+                df_top = pd.read_sql_query(base_query, conn, params=params)
+                if df_top.empty:
+                    return []
+                target_countries = df_top['NOC'].tolist()
+
+            # 2. Buscar evolução histórica APENAS para esses países
+            # Query otimizada que já agrupa por Ano e NOC
+            evo_query = f"""
+                SELECT Year, NOC, COUNT(*) as Medals
+                FROM athletes
+                WHERE Medal != 'No Medal'
+                AND NOC IN ({','.join(['?']*len(target_countries))})
+            """
+            evo_params = target_countries[:] # Cópia da lista
             
-        medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'NOC', 'Event', 'Medal'])
-        top_countries = medals_deduped['NOC'].value_counts().head(10).index.tolist()
-        target_countries = top_countries
-    
-    filtered = data_loader.query_filtered(
-        season=season, sex=sex, sport=sport, countries=target_countries
-    )
-    if filtered.empty:
-        return []
+            # Reaplicar filtros
+            if season and season != "Both":
+                evo_query += " AND Season = ?"
+                evo_params.append(season)
+            if sex and sex != "Both":
+                evo_query += " AND Sex = ?"
+                evo_params.append(sex)
+            if sport and sport != "All":
+                evo_query += " AND Sport = ?"
+                evo_params.append(sport)
 
-    medals_only = filtered[filtered['Medal'] != 'No Medal']
-    if medals_only.empty:
-        return []
+            # Agrupar por ano e país
+            evo_query += " GROUP BY Year, NOC ORDER BY Year"
+            
+            df_evo = pd.read_sql_query(evo_query, conn, params=evo_params)
+            
+            if df_evo.empty:
+                return []
 
-    medals_deduped = medals_only.drop_duplicates(subset=['Year', 'Season', 'NOC', 'Event', 'Medal'])
-    evolution = medals_deduped.groupby(['Year', 'NOC']).size().reset_index(name='Medals')
-    pivot = evolution.pivot(index='Year', columns='NOC', values='Medals').fillna(0).reset_index()
-    
-    return pivot.to_dict(orient='records')
+            # Pivot para formato do gráfico
+            pivot = df_evo.pivot(index='Year', columns='NOC', values='Medals').fillna(0).reset_index()
+            return pivot.to_dict(orient='records')
+            
+    except Exception as e:
+        print(f"Erro em evolution: {e}")
+        return []
 
 @router.get("/stats/medals")
 def get_medal_table(
