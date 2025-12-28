@@ -36,6 +36,17 @@ interface GroupedBiometricData {
   Athletes: BiometricData[];
 }
 
+const getMedalRank = (medal: string): number => {
+  const medalOrder: Record<string, number> = {
+    Gold: 3,
+    Silver: 2,
+    Bronze: 1,
+    NA: 0,
+    "No Medal": 0,
+  };
+  return medalOrder[medal] || 0;
+};
+
 // Exported for testing
 export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
@@ -44,14 +55,7 @@ export const CustomTooltip = memo(({ active, payload }: any) => {
     const data: GroupedBiometricData = payload[0].payload;
 
     const sortedAthletes = [...data.Athletes].sort((a, b) => {
-      const medalOrder: Record<string, number> = {
-        Gold: 3,
-        Silver: 2,
-        Bronze: 1,
-        NA: 0,
-        "No Medal": 0,
-      };
-      return medalOrder[b.Medal] - medalOrder[a.Medal];
+      return getMedalRank(b.Medal) - getMedalRank(a.Medal);
     });
 
     const displayAthletes = sortedAthletes.slice(0, 10);
@@ -116,7 +120,13 @@ function BiometricsChart({ data }: BiometricsChartProps) {
   const groupedData = useMemo(() => {
     if (!data) return { M: [], F: [] };
 
-    const groups: Record<string, GroupedBiometricData> = {};
+    const groups: Record<string, {
+      uniqueKey: string;
+      Sex: string;
+      Height: number;
+      Weight: number;
+      AthletesMap: Map<string, BiometricData>;
+    }> = {};
 
     data.forEach((d) => {
       const key = `${d.Weight}-${d.Height}-${d.Sex}`;
@@ -126,13 +136,24 @@ function BiometricsChart({ data }: BiometricsChartProps) {
           Sex: d.Sex,
           Height: d.Height,
           Weight: d.Weight,
-          Athletes: [],
+          AthletesMap: new Map(),
         };
       }
-      groups[key].Athletes.push(d);
+      
+      const existing = groups[key].AthletesMap.get(d.Name);
+      if (!existing || getMedalRank(d.Medal) > getMedalRank(existing.Medal)) {
+        groups[key].AthletesMap.set(d.Name, d);
+      }
     });
 
-    const allGroups = Object.values(groups);
+    const allGroups = Object.values(groups).map(g => ({
+      uniqueKey: g.uniqueKey,
+      Sex: g.Sex,
+      Height: g.Height,
+      Weight: g.Weight,
+      Athletes: Array.from(g.AthletesMap.values())
+    }));
+
     return {
       M: allGroups.filter((g) => g.Sex === "M"),
       F: allGroups.filter((g) => g.Sex === "F"),
