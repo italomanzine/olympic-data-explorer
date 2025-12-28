@@ -97,7 +97,7 @@ CustomTooltip.displayName = "CustomTooltip";
 function TopAthletesChart({ data, medalType = "Total" }: TopAthletesChartProps) {
   const { t } = useLanguage();
 
-  if (!data || data.length === 0) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400 text-sm">
         {t("no_data") || "Sem dados"}
