@@ -50,11 +50,14 @@ def get_map_stats(
 ):
     try:
         with data_loader.get_connection_context() as conn:
-            # Query otimizada: Agrega direto no banco
+            # Correção Lógica: Contar Eventos Distintos para não inflar medalhas de time
+            # Seleciona apenas as combinações únicas de (NOC, Event, Medal) antes de contar
             query = """
                 SELECT NOC, Medal, COUNT(*) as Count
-                FROM athletes
-                WHERE Medal != 'No Medal'
+                FROM (
+                    SELECT DISTINCT Year, Season, NOC, Event, Medal
+                    FROM athletes
+                    WHERE Medal != 'No Medal'
             """
             params = []
             
@@ -77,23 +80,16 @@ def get_map_stats(
                 query += " AND Sport = ?"
                 params.append(sport)
 
-            # Agrupamento essencial para performance
-            # Nota: Dados olímpicos têm duplicações por evento de equipe.
-            # O ideal seria DISTINCT Event antes de contar, mas SQLite complexo.
-            # Para mapa mundi, contagem aproximada é aceitável e muito mais rápida.
-            # Se precisarmos de precisão absoluta (1 medalha por time), precisamos de subquery.
-            # Vamos usar contagem direta por performance extrema.
-            query += " GROUP BY NOC, Medal"
+            # Fecha a subquery e agrupa
+            query += ") GROUP BY NOC, Medal"
             
             df = pd.read_sql_query(query, conn, params=params)
             
             if df.empty:
                 return []
                 
-            # Pivotar no Pandas (agora é leve, pois são poucas linhas)
             pivot = df.pivot(index='NOC', columns='Medal', values='Count').fillna(0)
             
-            # Garantir colunas
             for col in ['Gold', 'Silver', 'Bronze']:
                 if col not in pivot.columns:
                     pivot[col] = 0
@@ -125,7 +121,6 @@ def get_biometrics(
 ):
     try:
         with data_loader.get_connection_context() as conn:
-            # Query otimizada: Já filtra NaNs e limita a 2000 randomicos
             query = """
                 SELECT Name, Sex, Height, Weight, Medal, NOC, Year, Sport
                 FROM athletes
@@ -149,8 +144,6 @@ def get_biometrics(
                 query += " AND Sport = ?"
                 params.append(sport)
             
-            # Ordenação aleatória e limite direto no SQL
-            # Isso evita carregar 200k linhas para pegar 2k
             query += " ORDER BY RANDOM() LIMIT 2000"
             
             df = pd.read_sql_query(query, conn, params=params)
@@ -181,10 +174,13 @@ def get_evolution(
                 target_countries = countries
             
             if not target_countries:
+                # 1. Definir Top 10 com base na contagem CORRETA (deduplicada)
                 base_query = """
                     SELECT NOC, COUNT(*) as Medals 
-                    FROM athletes 
-                    WHERE Medal != 'No Medal'
+                    FROM (
+                        SELECT DISTINCT Year, Season, NOC, Event, Medal
+                        FROM athletes 
+                        WHERE Medal != 'No Medal'
                 """
                 params = []
                 if season and season != "Both":
@@ -197,16 +193,20 @@ def get_evolution(
                     base_query += " AND Sport = ?"
                     params.append(sport)
                 
-                base_query += " GROUP BY NOC ORDER BY Medals DESC LIMIT 10"
+                base_query += ") GROUP BY NOC ORDER BY Medals DESC LIMIT 10"
+                
                 df_top = pd.read_sql_query(base_query, conn, params=params)
                 if df_top.empty: return []
                 target_countries = df_top['NOC'].tolist()
 
+            # 2. Evolução com contagem correta
             evo_query = f"""
                 SELECT Year, NOC, COUNT(*) as Medals
-                FROM athletes
-                WHERE Medal != 'No Medal'
-                AND NOC IN ({','.join(['?']*len(target_countries))})
+                FROM (
+                    SELECT DISTINCT Year, Season, NOC, Event, Medal
+                    FROM athletes
+                    WHERE Medal != 'No Medal'
+                    AND NOC IN ({','.join(['?']*len(target_countries))})
             """
             evo_params = target_countries[:]
             
@@ -220,7 +220,7 @@ def get_evolution(
                 evo_query += " AND Sport = ?"
                 evo_params.append(sport)
 
-            evo_query += " GROUP BY Year, NOC ORDER BY Year"
+            evo_query += ") GROUP BY Year, NOC ORDER BY Year"
             
             df_evo = pd.read_sql_query(evo_query, conn, params=evo_params)
             if df_evo.empty: return []
@@ -242,13 +242,20 @@ def get_medal_table(
 ):
     try:
         with data_loader.get_connection_context() as conn:
-            # Define chave de agrupamento
             group_col = 'Sport' if (country and country != "All") else 'NOC'
             
+            # Query com deduplicação para contagem correta
+            # Nota: Se group_col for Sport, deduplicamos por (Sport, Event, Medal)
+            # Se for NOC, deduplicamos por (NOC, Event, Medal)
+            
+            # A query abaixo é genérica o suficiente:
+            # Seleciona eventos distintos com suas chaves de agrupamento
             query = f"""
                 SELECT {group_col} as Key, Medal, COUNT(*) as Count
-                FROM athletes
-                WHERE Medal != 'No Medal'
+                FROM (
+                    SELECT DISTINCT Year, Season, NOC, Sport, Event, Medal
+                    FROM athletes
+                    WHERE Medal != 'No Medal'
             """
             params = []
             
@@ -268,14 +275,13 @@ def get_medal_table(
                 query += " AND Sport = ?"
                 params.append(sport)
                 
-            query += f" GROUP BY {group_col}, Medal"
+            query += f") GROUP BY {group_col}, Medal"
             
             df = pd.read_sql_query(query, conn, params=params)
             
             if df.empty:
                 return []
                 
-            # Pivot manual ou via pandas
             pivot = df.pivot(index='Key', columns='Medal', values='Count').fillna(0)
             
             for col in ['Gold', 'Silver', 'Bronze']:
@@ -285,7 +291,6 @@ def get_medal_table(
             pivot['Total'] = pivot['Gold'] + pivot['Silver'] + pivot['Bronze']
             pivot = pivot.sort_values(by=['Gold', 'Silver', 'Bronze'], ascending=False)
             
-            # Map NOC names se necessário
             noc_map = {}
             if group_col == 'NOC':
                 noc_map = data_loader.get_noc_map()
@@ -323,15 +328,22 @@ def get_top_athletes(
 ):
     try:
         with data_loader.get_connection_context() as conn:
-            # Query otimizada: Agrupa e ordena no SQL
+            # Para atletas, a contagem é individual (não deduplica evento de time)
+            # Mas devemos garantir que não estamos duplicando por joins errados
+            # A query anterior estava certa, mas vou usar uma versão segura
+            # que considera DISTINCT Year, Season, Event para o mesmo atleta
+            # para evitar duplicação caso o dataset tenha linhas repetidas sujas
+            
             query = """
                 SELECT ID, Name, NOC,
                     SUM(CASE WHEN Medal = 'Gold' THEN 1 ELSE 0 END) as Gold,
                     SUM(CASE WHEN Medal = 'Silver' THEN 1 ELSE 0 END) as Silver,
                     SUM(CASE WHEN Medal = 'Bronze' THEN 1 ELSE 0 END) as Bronze,
                     COUNT(*) as Total
-                FROM athletes
-                WHERE Medal != 'No Medal'
+                FROM (
+                    SELECT DISTINCT ID, Name, NOC, Year, Season, Event, Medal
+                    FROM athletes
+                    WHERE Medal != 'No Medal'
             """
             params = []
             
@@ -358,16 +370,28 @@ def get_top_athletes(
                 query += " AND Medal = ?"
                 params.append(medal_type)
 
-            query += " GROUP BY ID, Name, NOC"
+            query += ") GROUP BY ID, Name, NOC"
             
-            # Ordenação dinâmica
             sort_col = medal_type if medal_type and medal_type != "Total" else 'Total'
             query += f" ORDER BY {sort_col} DESC LIMIT ?"
             params.append(limit)
             
             df = pd.read_sql_query(query, conn, params=params)
             
-            return df.to_dict(orient='records')
+            # Garantir que os tipos sejam int nativos do Python para JSON serializable
+            records = df.to_dict(orient='records')
+            for record in records:
+                record['gold'] = int(record['Gold'])
+                record['silver'] = int(record['Silver'])
+                record['bronze'] = int(record['Bronze'])
+                record['total'] = int(record['Total'])
+                # Remove chaves maiúsculas se o frontend esperar minúsculas
+                del record['Gold']
+                del record['Silver']
+                del record['Bronze']
+                del record['Total']
+                
+            return records
             
     except Exception as e:
         print(f"Erro top athletes: {e}")
