@@ -3,9 +3,49 @@ from .data_loader import data_loader
 import pandas as pd
 from typing import List, Optional, Dict, Any
 
+import functools
+import json
+
+# Simple in-memory cache
+# Key: JSON string of params
+# Value: Result dict
+RESPONSE_CACHE = {}
+
 router = APIRouter()
 
+def get_cache_key(func_name, kwargs):
+    # Filter out None values and sort keys for consistency
+    clean_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    # Handle unhashable types like lists by converting to sorted tuples/strings
+    serializable_kwargs = {}
+    for k, v in clean_kwargs.items():
+        if isinstance(v, list):
+            serializable_kwargs[k] = sorted(v)
+        else:
+            serializable_kwargs[k] = v
+            
+    return f"{func_name}:{json.dumps(serializable_kwargs, sort_keys=True)}"
+
+def cached_endpoint(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        key = get_cache_key(func.__name__, kwargs)
+        if key in RESPONSE_CACHE:
+            return RESPONSE_CACHE[key]
+        
+        result = func(*args, **kwargs)
+        
+        # Cache non-empty results (or all? assuming data is static)
+        # Limiting cache size manually if needed, but for this assignment memory should be fine
+        if len(RESPONSE_CACHE) > 1000:
+            RESPONSE_CACHE.clear() # Simple flush
+            
+        RESPONSE_CACHE[key] = result
+        return result
+    return wrapper
+
 @router.get("/filters")
+@cached_endpoint
 def get_filters():
     try:
         years = data_loader.get_unique_values('Year')
@@ -39,6 +79,7 @@ def get_filters():
         return {"years": [], "sports": [], "countries": [], "year_season_map": {}}
 
 @router.get("/stats/map")
+@cached_endpoint
 def get_map_stats(
     year: Optional[int] = None, 
     start_year: Optional[int] = None,
@@ -112,6 +153,7 @@ def get_map_stats(
         return []
 
 @router.get("/stats/biometrics")
+@cached_endpoint
 def get_biometrics(
     sport: Optional[str] = "All", 
     year: Optional[int] = None,
@@ -144,7 +186,8 @@ def get_biometrics(
                 query += " AND Sport = ?"
                 params.append(sport)
             
-            query += " ORDER BY RANDOM() LIMIT 2000"
+            # Performance fix: Removed ORDER BY RANDOM() which is very slow on large tables
+            query += " LIMIT 2000"
             
             df = pd.read_sql_query(query, conn, params=params)
             
@@ -158,6 +201,7 @@ def get_biometrics(
         return []
 
 @router.get("/stats/evolution")
+@cached_endpoint
 def get_evolution(
     countries: Optional[List[str]] = Query(None),
     season: Optional[str] = None,
@@ -233,6 +277,7 @@ def get_evolution(
         return []
 
 @router.get("/stats/medals")
+@cached_endpoint
 def get_medal_table(
     year: Optional[int] = None, 
     season: Optional[str] = None, 
@@ -315,6 +360,7 @@ def get_medal_table(
         return []
 
 @router.get("/stats/top-athletes")
+@cached_endpoint
 def get_top_athletes(
     year: Optional[int] = None,
     start_year: Optional[int] = None,

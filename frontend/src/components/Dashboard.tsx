@@ -176,15 +176,34 @@ export default function Dashboard() {
       setLoading(true);
       isLoadingRef.current = true;
       try {
-        const [mapRes, bioRes, evoRes, tableRes, topAthletesRes] = await Promise.all([
+        // Otimização: EvolutionChart mostra histórico completo e não depende do ano selecionado.
+        // Verificamos cache separado para evolução ignorando o ano.
+        const evolutionFilters = { ...debouncedFilters, year: undefined };
+        const evolutionCacheKey = getCacheKey(evolutionFilters);
+        let evoRes = getCachedData(evolutionCacheKey);
+        
+        const promises: Promise<any>[] = [
           fetchMapStats(debouncedFilters),
           fetchBiometrics(debouncedFilters),
-          fetchEvolution(debouncedFilters),
           fetchMedalTable(debouncedFilters),
           fetchTopAthletes(debouncedFilters)
-        ]);
+        ];
+
+        // Se não tem cache de evolução, adiciona ao request
+        let evoPromise: Promise<any> | null = null;
+        if (!evoRes) {
+           evoPromise = fetchEvolution(evolutionFilters);
+        }
+
+        const [mapRes, bioRes, tableRes, topAthletesRes] = await Promise.all(promises);
         
-        // Cache os resultados
+        if (evoPromise) {
+            evoRes = await evoPromise;
+            // Salva no cache específico de evolução
+            setCachedData(evolutionCacheKey, evoRes);
+        }
+        
+        // Salva no cache principal (com ano) para acesso rápido na checagem inicial da função
         setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes, topAthletes: topAthletesRes });
         
         // Prefetch do próximo ano durante animação
@@ -195,16 +214,17 @@ export default function Dashboard() {
             const nextYear = filteredYears[nextIndex];
             const nextFilters = { ...debouncedFilters, year: nextYear };
             const nextCacheKey = getCacheKey(nextFilters);
+            
             if (!getCachedData(nextCacheKey)) {
-              // Prefetch silencioso do próximo ano
+              // Prefetch silencioso (sem evolution, pois já temos/teremos)
               Promise.all([
                 fetchMapStats(nextFilters),
                 fetchBiometrics(nextFilters),
-                fetchEvolution(nextFilters),
                 fetchMedalTable(nextFilters),
                 fetchTopAthletes(nextFilters)
-              ]).then(([mapR, bioR, evoR, tableR, topAthR]) => {
-                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoR, table: tableR, topAthletes: topAthR });
+              ]).then(([mapR, bioR, tableR, topAthR]) => {
+                // Reutiliza o evoRes atual para o cache do próximo ano
+                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoRes, table: tableR, topAthletes: topAthR });
               }).catch(() => {}); // Silencioso
             }
           }
