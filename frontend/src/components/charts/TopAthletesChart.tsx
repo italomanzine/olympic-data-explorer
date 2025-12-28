@@ -24,7 +24,7 @@ interface TopAthlete {
 }
 
 interface TopAthletesChartProps {
-  data: TopAthlete[];
+  data?: TopAthlete[]; // Tornar opcional para evitar erro se não for passado
   medalType?: string;
 }
 
@@ -40,7 +40,7 @@ const MEDAL_COLORS = {
 export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
 
-  if (active && payload && payload.length) {
+  if (active && payload && Array.isArray(payload) && payload.length > 0) {
     const athlete = payload[0]?.payload;
     if (!athlete) return null;
 
@@ -94,10 +94,13 @@ export const CustomTooltip = memo(({ active, payload }: any) => {
 
 CustomTooltip.displayName = "CustomTooltip";
 
-function TopAthletesChart({ data, medalType = "Total" }: TopAthletesChartProps) {
+function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartProps) {
   const { t } = useLanguage();
 
-  if (!data || !Array.isArray(data) || data.length === 0) {
+  // Verificação defensiva extra
+  const safeData = Array.isArray(data) ? data : [];
+
+  if (safeData.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400 text-sm">
         {t("no_data") || "Sem dados"}
@@ -106,13 +109,16 @@ function TopAthletesChart({ data, medalType = "Total" }: TopAthletesChartProps) 
   }
 
   // Formatar dados para exibição (nome abreviado)
-  const formattedData = data.map((athlete) => ({
-    ...athlete,
-    displayName:
-      athlete.name.length > 20
-        ? athlete.name.substring(0, 18) + "..."
-        : athlete.name,
-  }));
+  const formattedData = safeData.map((athlete) => {
+    if (!athlete || !athlete.name) return { ...athlete, displayName: "Unknown" };
+    return {
+      ...athlete,
+      displayName:
+        athlete.name.length > 20
+          ? athlete.name.substring(0, 18) + "..."
+          : athlete.name,
+    };
+  });
 
   // Determinar qual barra mostrar baseado no filtro de medalha
   const getBarConfig = () => {
