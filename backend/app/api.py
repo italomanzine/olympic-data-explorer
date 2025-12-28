@@ -152,6 +152,64 @@ def get_map_stats(
         print(f"Erro map stats: {e}")
         return []
 
+@router.get("/stats/gender")
+@cached_endpoint
+def get_gender_stats(
+    year: Optional[int] = None, 
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+    season: Optional[str] = None, 
+    sex: Optional[str] = None,
+    country: Optional[str] = None,
+    sport: Optional[str] = None,
+    medal_type: Optional[str] = None
+):
+    try:
+        with data_loader.get_connection_context() as conn:
+            # Contar atletas únicos por sexo
+            query = """
+                SELECT Sex, COUNT(DISTINCT ID) as Count
+                FROM athletes
+                WHERE 1=1
+            """
+            params = []
+            
+            if year:
+                query += " AND Year = ?"
+                params.append(year)
+            if start_year is not None and end_year is not None:
+                query += " AND Year >= ? AND Year <= ?"
+                params.extend([start_year, end_year])
+            if season and season != "Both":
+                query += " AND Season = ?"
+                params.append(season)
+            if sex and sex != "Both":
+                query += " AND Sex = ?"
+                params.append(sex)
+            if country and country != "All":
+                query += " AND NOC = ?"
+                params.append(country)
+            if sport and sport != "All":
+                query += " AND Sport = ?"
+                params.append(sport)
+            
+            if medal_type and medal_type != "Total":
+                query += " AND Medal = ?"
+                params.append(medal_type)
+            
+            query += " GROUP BY Sex"
+            
+            df = pd.read_sql_query(query, conn, params=params)
+            
+            if df.empty:
+                return []
+                
+            return df.to_dict(orient='records')
+            
+    except Exception as e:
+        print(f"Erro gender stats: {e}")
+        return []
+
 @router.get("/stats/biometrics")
 @cached_endpoint
 def get_biometrics(

@@ -78,6 +78,10 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_gold: "Ouro",
     filter_silver: "Prata",
     filter_bronze: "Bronze",
+    
+    // Gráfico de Pizza
+    gender_distribution: "Distribuição por Gênero",
+    athletes: "atletas",
   },
   'en': {
     app_title: "Olympic Dashboard",
@@ -143,6 +147,10 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_gold: "Gold",
     filter_silver: "Silver",
     filter_bronze: "Bronze",
+    
+    // Pie Chart
+    gender_distribution: "Gender Distribution",
+    athletes: "athletes",
   },
   'es': {
     app_title: "Tablero Olímpico",
@@ -208,6 +216,10 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_gold: "Oro",
     filter_silver: "Plata",
     filter_bronze: "Bronce",
+    
+    // Gráfico Circular
+    gender_distribution: "Distribución por Género",
+    athletes: "atletas",
   },
   'fr': {
     app_title: "Tableau de Bord Olympique",
@@ -273,6 +285,10 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_gold: "Or",
     filter_silver: "Argent",
     filter_bronze: "Bronze",
+    
+    // Camembert
+    gender_distribution: "Répartition par Sexe",
+    athletes: "athlètes",
   },
   'zh': {
     app_title: "奥运仪表板",
@@ -338,6 +354,10 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_gold: "金牌",
     filter_silver: "银牌",
     filter_bronze: "铜牌",
+    
+    // 饼图
+    gender_distribution: "性别分布",
+    athletes: "运动员",
   }
 };
 

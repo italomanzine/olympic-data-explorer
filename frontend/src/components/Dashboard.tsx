@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useTransition } from "react";
-import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, fetchTopAthletes, FilterState, MedalStat, AthleteSearchResult, AthleteProfile, AthleteStats, TopAthlete, fetchAthleteProfile, fetchAthleteStats } from "../lib/api";
+import { fetchFilters, fetchMapStats, fetchBiometrics, fetchEvolution, fetchMedalTable, fetchTopAthletes, fetchGenderStats, FilterState, MedalStat, AthleteSearchResult, AthleteProfile, AthleteStats, TopAthlete, GenderStat, fetchAthleteProfile, fetchAthleteStats } from "../lib/api";
 import WorldMap from "./charts/WorldMap";
 import BiometricsChart from "./charts/BiometricsChart";
 import EvolutionChart from "./charts/EvolutionChart";
 import TopAthletesChart from "./charts/TopAthletesChart";
+import GenderPieChart from "./charts/GenderPieChart";
 import MedalTable from "./MedalTable"; 
 import RangeSlider from "./ui/RangeSlider";
 import SearchableSelect from "./ui/SearchableSelect";
@@ -88,10 +89,11 @@ export default function Dashboard() {
   const [evolutionData, setEvolutionData] = useState([]);
   const [medalTableData, setMedalTableData] = useState<MedalStat[]>([]); 
   const [topAthletesData, setTopAthletesData] = useState<TopAthlete[]>([]);
+  const [genderData, setGenderData] = useState<GenderStat[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Estados para modais de gráficos maximizados
-  const [expandedChart, setExpandedChart] = useState<'map' | 'biometrics' | 'evolution' | 'medals' | 'topAthletes' | null>(null);
+  const [expandedChart, setExpandedChart] = useState<'map' | 'biometrics' | 'evolution' | 'medals' | 'topAthletes' | 'gender' | null>(null);
 
   // Carregar dados do atleta quando selecionado
   useEffect(() => {
@@ -167,6 +169,7 @@ export default function Dashboard() {
         setEvolutionData(cached.evo);
         setMedalTableData(cached.table);
         setTopAthletesData(cached.topAthletes);
+        setGenderData(cached.gender || []);
       });
       setLoading(false);
       return;
@@ -186,7 +189,8 @@ export default function Dashboard() {
           fetchMapStats(debouncedFilters),
           fetchBiometrics(debouncedFilters),
           fetchMedalTable(debouncedFilters),
-          fetchTopAthletes(debouncedFilters)
+          fetchTopAthletes(debouncedFilters),
+          fetchGenderStats(debouncedFilters)
         ];
 
         // Se não tem cache de evolução, adiciona ao request
@@ -195,7 +199,7 @@ export default function Dashboard() {
            evoPromise = fetchEvolution(evolutionFilters);
         }
 
-        const [mapRes, bioRes, tableRes, topAthletesRes] = await Promise.all(promises);
+        const [mapRes, bioRes, tableRes, topAthletesRes, genderRes] = await Promise.all(promises);
         
         if (evoPromise) {
             evoRes = await evoPromise;
@@ -204,7 +208,7 @@ export default function Dashboard() {
         }
         
         // Salva no cache principal (com ano) para acesso rápido na checagem inicial da função
-        setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes, topAthletes: topAthletesRes });
+        setCachedData(cacheKey, { map: mapRes, bio: bioRes, evo: evoRes, table: tableRes, topAthletes: topAthletesRes, gender: genderRes });
         
         // Prefetch do próximo ano durante animação
         if (isPlaying) {
@@ -221,10 +225,11 @@ export default function Dashboard() {
                 fetchMapStats(nextFilters),
                 fetchBiometrics(nextFilters),
                 fetchMedalTable(nextFilters),
-                fetchTopAthletes(nextFilters)
-              ]).then(([mapR, bioR, tableR, topAthR]) => {
+                fetchTopAthletes(nextFilters),
+                fetchGenderStats(nextFilters)
+              ]).then(([mapR, bioR, tableR, topAthR, genderR]) => {
                 // Reutiliza o evoRes atual para o cache do próximo ano
-                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoRes, table: tableR, topAthletes: topAthR });
+                setCachedData(nextCacheKey, { map: mapR, bio: bioR, evo: evoRes, table: tableR, topAthletes: topAthR, gender: genderR });
               }).catch(() => {}); // Silencioso
             }
           }
@@ -237,6 +242,7 @@ export default function Dashboard() {
           setEvolutionData(evoRes);
           setMedalTableData(tableRes);
           setTopAthletesData(topAthletesRes);
+          setGenderData(genderRes);
         });
         setError(null);
       } catch (e) {
@@ -522,21 +528,8 @@ export default function Dashboard() {
                 {/* Grid Inferior */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[400px]">
                    
-                   {/* Biometria */}
+                   {/* Evolução */}
                    <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-full">
-                    <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
-                      <h2 className="font-bold text-slate-800 truncate">
-                         {t('biometrics_title')} {filters.sport === "All" ? t('biometrics_general') : tSport(filters.sport || '')}
-                      </h2>
-                      <MaximizeButton onClick={() => setExpandedChart('biometrics')} label={t('expand') || 'Expandir'} />
-                    </div>
-                    <div className="flex-1 p-4 min-h-0 h-full">
-                      <BiometricsChart data={biometricsData} />
-                    </div>
-                  </section>
-
-                  {/* Evolução */}
-                  <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-full">
                     <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
                       <h2 className="font-bold text-slate-800 truncate">
                         {filters.country !== "All" 
@@ -547,6 +540,19 @@ export default function Dashboard() {
                     </div>
                     <div className="flex-1 p-4 min-h-0 h-full">
                       <EvolutionChart data={evolutionData} />
+                    </div>
+                  </section>
+
+                  {/* Gráfico de Pizza - Gênero (Agora aqui) */}
+                  <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-full">
+                    <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
+                      <h2 className="font-bold text-slate-800">
+                        {t('gender_distribution') || 'Distribuição por Gênero'}
+                      </h2>
+                      <MaximizeButton onClick={() => setExpandedChart('gender')} label={t('expand') || 'Expandir'} />
+                    </div>
+                    <div className="flex-1 p-4 min-h-0 h-full">
+                      <GenderPieChart data={genderData} />
                     </div>
                   </section>
                 </div>
@@ -575,13 +581,26 @@ export default function Dashboard() {
                   </div>
                 </section>
 
+                {/* Biometria (Agora abaixo do Top 10 e com mesmo tamanho) */}
+                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all hover:shadow-md h-[400px] shrink-0">
+                  <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex justify-between items-center">
+                    <h2 className="font-bold text-slate-800 truncate">
+                        {t('biometrics_title')} {filters.sport === "All" ? t('biometrics_general') : tSport(filters.sport || '')}
+                    </h2>
+                    <MaximizeButton onClick={() => setExpandedChart('biometrics')} label={t('expand') || 'Expandir'} />
+                  </div>
+                  <div className="flex-1 p-4 min-h-0 h-full">
+                    <BiometricsChart data={biometricsData} />
+                  </div>
+                </section>
+
               </div>
 
               {/* Coluna Direita (Quadro de Medalhas / Perfil do Atleta) */}
               <div className="flex-1 xl:max-w-[400px] flex flex-col gap-6">
                  {/* Perfil do Atleta - aparece quando selecionado */}
                  {selectedAthlete && athleteProfile && (
-                   <div className="sticky top-6">
+                   <div className="sticky top-6 z-20">
                      <AthleteProfileCard 
                        profile={athleteProfile}
                        onClose={() => setSelectedAthlete(null)}
@@ -758,6 +777,15 @@ export default function Dashboard() {
             title={filters.country !== "All" ? t('medal_table_sport') : t('medal_table_title')}
           />
         </div>
+      </ChartModal>
+
+      <ChartModal
+        isOpen={expandedChart === 'gender'}
+        onClose={() => setExpandedChart(null)}
+        title={t('gender_distribution') || 'Distribuição por Gênero'}
+        subtitle={getYearLabel(filters.year ?? null)}
+      >
+        <GenderPieChart data={genderData} />
       </ChartModal>
 
       <ChartModal

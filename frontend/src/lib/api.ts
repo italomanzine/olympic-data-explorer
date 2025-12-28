@@ -98,6 +98,20 @@ export async function fetchTopAthletes(filters: FilterState, limit: number = 10)
   return res.json();
 }
 
+// ===== Gender Stats =====
+
+export interface GenderStat {
+  Sex: string;
+  Count: number;
+}
+
+export async function fetchGenderStats(filters: FilterState): Promise<GenderStat[]> {
+  const params = buildParams(filters);
+  const res = await fetch(`${API_BASE_URL}/stats/gender?${params}`);
+  if (!res.ok) throw new Error("Failed to fetch gender stats");
+  return res.json();
+}
+
 // ===== Athlete Search & Profile =====
 
 export interface AthleteSearchResult {
