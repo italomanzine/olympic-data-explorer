@@ -334,12 +334,13 @@ def get_top_athletes(
             # que considera DISTINCT Year, Season, Event para o mesmo atleta
             # para evitar duplicação caso o dataset tenha linhas repetidas sujas
             
+            # Alias AS id, AS name, AS noc (minúsculas) para facilitar o frontend
             query = """
-                SELECT ID, Name, NOC,
-                    SUM(CASE WHEN Medal = 'Gold' THEN 1 ELSE 0 END) as Gold,
-                    SUM(CASE WHEN Medal = 'Silver' THEN 1 ELSE 0 END) as Silver,
-                    SUM(CASE WHEN Medal = 'Bronze' THEN 1 ELSE 0 END) as Bronze,
-                    COUNT(*) as Total
+                SELECT ID as id, Name as name, NOC as noc,
+                    SUM(CASE WHEN Medal = 'Gold' THEN 1 ELSE 0 END) as gold,
+                    SUM(CASE WHEN Medal = 'Silver' THEN 1 ELSE 0 END) as silver,
+                    SUM(CASE WHEN Medal = 'Bronze' THEN 1 ELSE 0 END) as bronze,
+                    COUNT(*) as total
                 FROM (
                     SELECT DISTINCT ID, Name, NOC, Year, Season, Event, Medal
                     FROM athletes
@@ -372,26 +373,15 @@ def get_top_athletes(
 
             query += ") GROUP BY ID, Name, NOC"
             
-            sort_col = medal_type if medal_type and medal_type != "Total" else 'Total'
+            # Use as chaves minúsculas na ordenação
+            sort_col = medal_type.lower() if medal_type and medal_type != "Total" else 'total'
             query += f" ORDER BY {sort_col} DESC LIMIT ?"
             params.append(limit)
             
             df = pd.read_sql_query(query, conn, params=params)
             
-            # Garantir que os tipos sejam int nativos do Python para JSON serializable
-            records = df.to_dict(orient='records')
-            for record in records:
-                record['gold'] = int(record['Gold'])
-                record['silver'] = int(record['Silver'])
-                record['bronze'] = int(record['Bronze'])
-                record['total'] = int(record['Total'])
-                # Remove chaves maiúsculas se o frontend esperar minúsculas
-                del record['Gold']
-                del record['Silver']
-                del record['Bronze']
-                del record['Total']
-                
-            return records
+            # O dataframe já virá com colunas 'id', 'name', 'noc', 'gold', 'silver', 'bronze', 'total'
+            return df.to_dict(orient='records')
             
     except Exception as e:
         print(f"Erro top athletes: {e}")
