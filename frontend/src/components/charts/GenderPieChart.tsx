@@ -8,8 +8,8 @@ interface GenderPieChartProps {
 }
 
 const COLORS = {
-  M: '#0081C8', // Azul olímpico
-  F: '#EE334E'  // Vermelho olímpico
+  M: '#0081C8',
+  F: '#EE334E'
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -46,7 +46,7 @@ export default function GenderPieChart({ data }: GenderPieChartProps) {
       name: item.Sex,
       value: item.Count,
       percent: (item.Count / total) * 100
-    })).sort((a, b) => b.value - a.value); // Ordenar para consistência visual
+    })).sort((a, b) => b.value - a.value);
   }, [data]);
 
   if (!data || data.length === 0) {
@@ -89,4 +89,3 @@ export default function GenderPieChart({ data }: GenderPieChartProps) {
     </div>
   );
 }
-

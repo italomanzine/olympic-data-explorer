@@ -160,4 +160,54 @@ describe('MedalTable', () => {
     // In pt-BR, Swimming should be translated to Natação
     expect(screen.getByText('Natação')).toBeInTheDocument();
   });
+
+  it('should show loading skeleton when isLoading is true', () => {
+    const { container } = renderWithProvider({
+      data: [],
+      title: 'Medal Table',
+      isLoading: true,
+    });
+
+    // Should render skeleton rows
+    const skeletonRows = container.querySelectorAll('.animate-pulse');
+    expect(skeletonRows.length).toBeGreaterThan(0);
+  });
+
+  it('should show spinner in header when isLoading is true', () => {
+    const { container } = renderWithProvider({
+      data: [],
+      title: 'Medal Table',
+      isLoading: true,
+    });
+
+    // Should show spinner
+    const spinner = container.querySelector('.animate-spin');
+    expect(spinner).toBeInTheDocument();
+  });
+
+  it('should not show skeleton when isLoading is false', () => {
+    const { container } = renderWithProvider({
+      data: [],
+      title: 'Medal Table',
+      isLoading: false,
+    });
+
+    // Should not render skeleton rows
+    const skeletonRows = container.querySelectorAll('.animate-pulse');
+    expect(skeletonRows.length).toBe(0);
+  });
+
+  it('should show data instead of skeleton when isLoading is false with data', () => {
+    const mockData = [
+      { name: 'USA', code: 'USA', gold: 50, silver: 30, bronze: 20, total: 100 },
+    ];
+
+    renderWithProvider({
+      data: mockData,
+      title: 'Medal Table',
+      isLoading: false,
+    });
+
+    expect(screen.getByText('50')).toBeInTheDocument();
+  });
 });

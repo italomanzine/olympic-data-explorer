@@ -18,10 +18,6 @@ const SIZE_MAP = {
   xl: { width: 64, height: 48 },
 };
 
-/**
- * Componente de bandeira de país baseado no código NOC
- * Usa flagcdn.com como fonte das imagens
- */
 function CountryFlag({ 
   noc, 
   size = 'sm', 
@@ -33,7 +29,6 @@ function CountryFlag({
   const { src, srcSet } = getFlagWithSrcSet(noc);
 
   if (hasError && showFallback) {
-    // Fallback: mostrar código do país em um badge
     return (
       <span 
         className={`inline-flex items-center justify-center bg-slate-200 text-slate-600 text-[10px] font-bold rounded ${className}`}

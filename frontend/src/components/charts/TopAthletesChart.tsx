@@ -24,7 +24,7 @@ interface TopAthlete {
 }
 
 interface TopAthletesChartProps {
-  data?: TopAthlete[]; // Tornar opcional para evitar erro se não for passado
+  data?: TopAthlete[];
   medalType?: string;
 }
 
@@ -35,7 +35,6 @@ const MEDAL_COLORS = {
   total: "#3B82F6",
 };
 
-// Exported for testing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
@@ -97,7 +96,6 @@ CustomTooltip.displayName = "CustomTooltip";
 function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartProps) {
   const { t } = useLanguage();
 
-  // Verificação defensiva extra
   const safeData = Array.isArray(data) ? data : [];
 
   if (safeData.length === 0) {
@@ -108,7 +106,6 @@ function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartPr
     );
   }
 
-  // Formatar dados para exibição (nome abreviado)
   const formattedData = safeData.map((athlete) => {
     if (!athlete || !athlete.name) return { ...athlete, displayName: "Unknown" };
     return {
@@ -120,7 +117,6 @@ function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartPr
     };
   });
 
-  // Determinar qual barra mostrar baseado no filtro de medalha
   const getBarConfig = () => {
     switch (medalType) {
       case "Gold":
@@ -130,7 +126,7 @@ function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartPr
       case "Bronze":
         return { dataKey: "bronze", fill: MEDAL_COLORS.bronze, name: t("bronze") };
       default:
-        return null; // Stacked bars for total
+        return null;
     }
   };
 
@@ -161,7 +157,6 @@ function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartPr
         <Tooltip content={<CustomTooltip />} />
         
         {singleBarConfig ? (
-          // Single bar for specific medal type
           <Bar
             dataKey={singleBarConfig.dataKey}
             fill={singleBarConfig.fill}
@@ -169,7 +164,6 @@ function TopAthletesChart({ data = [], medalType = "Total" }: TopAthletesChartPr
             radius={[0, 4, 4, 0]}
           />
         ) : (
-          // Stacked bars for total
           <>
             <Bar
               dataKey="gold"

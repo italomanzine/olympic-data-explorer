@@ -78,8 +78,6 @@ export async function fetchMedalTable(filters: FilterState): Promise<MedalStat[]
   return res.json();
 }
 
-// ===== Top Athletes =====
-
 export interface TopAthlete {
   id: number;
   name: string;
@@ -98,8 +96,6 @@ export async function fetchTopAthletes(filters: FilterState, limit: number = 10)
   return res.json();
 }
 
-// ===== Gender Stats =====
-
 export interface GenderStat {
   Sex: string;
   Count: number;
@@ -111,8 +107,6 @@ export async function fetchGenderStats(filters: FilterState): Promise<GenderStat
   if (!res.ok) throw new Error("Failed to fetch gender stats");
   return res.json();
 }
-
-// ===== Athlete Search & Profile =====
 
 export interface AthleteSearchResult {
   id: number;

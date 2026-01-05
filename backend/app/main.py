@@ -4,11 +4,9 @@ from .api import router as api_router
 
 app = FastAPI(title="Olympic Data API")
 
-# Configuração CORS para permitir que o frontend acesse
-# Em produção, você pode restringir isso para o domínio do seu frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite qualquer origem (ideal para portfólio/testes rápidos)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,4 +21,3 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-

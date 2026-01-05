@@ -6,27 +6,24 @@ from typing import List, Optional, Dict, Any
 import functools
 import json
 
-# Simple in-memory cache
-# Key: JSON string of params
-# Value: Result dict
+# Cache em memória para respostas
 RESPONSE_CACHE = {}
 
 router = APIRouter()
 
 def get_cache_key(func_name, kwargs):
-    # Filter out None values and sort keys for consistency
+    """Gera chave única para cache baseada nos parâmetros."""
     clean_kwargs = {k: v for k, v in kwargs.items() if v is not None}
-    # Handle unhashable types like lists by converting to sorted tuples/strings
     serializable_kwargs = {}
     for k, v in clean_kwargs.items():
         if isinstance(v, list):
             serializable_kwargs[k] = sorted(v)
         else:
             serializable_kwargs[k] = v
-            
     return f"{func_name}:{json.dumps(serializable_kwargs, sort_keys=True)}"
 
 def cached_endpoint(func):
+    """Decorator para cachear respostas de endpoints."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         key = get_cache_key(func.__name__, kwargs)
@@ -35,10 +32,8 @@ def cached_endpoint(func):
         
         result = func(*args, **kwargs)
         
-        # Cache non-empty results (or all? assuming data is static)
-        # Limiting cache size manually if needed, but for this assignment memory should be fine
         if len(RESPONSE_CACHE) > 1000:
-            RESPONSE_CACHE.clear() # Simple flush
+            RESPONSE_CACHE.clear()
             
         RESPONSE_CACHE[key] = result
         return result
@@ -47,6 +42,7 @@ def cached_endpoint(func):
 @router.get("/filters")
 @cached_endpoint
 def get_filters():
+    """Retorna opções de filtros disponíveis."""
     try:
         years = data_loader.get_unique_values('Year')
         sports = ["All"] + data_loader.get_unique_values('Sport')
@@ -54,16 +50,12 @@ def get_filters():
         noc_map = data_loader.get_noc_map()
         sorted_nocs = sorted(noc_map.keys())
         
-        countries_list = []
-        countries_list.append({"code": "All", "label": "Todos os Países"})
+        countries_list = [{"code": "All", "label": "Todos os Países"}]
         
         temp_list = []
         for noc in sorted_nocs:
             name = noc_map.get(noc, noc)
-            temp_list.append({
-                "code": noc, 
-                "label": f"{name} ({noc})"
-            })
+            temp_list.append({"code": noc, "label": f"{name} ({noc})"})
             
         temp_list.sort(key=lambda x: x['label'])
         countries_list.extend(temp_list)
@@ -89,10 +81,10 @@ def get_map_stats(
     country: Optional[str] = None,
     sport: Optional[str] = None
 ):
+    """Retorna medalhas por país para o mapa."""
     try:
         with data_loader.get_connection_context() as conn:
-            # Correção Lógica: Contar Eventos Distintos para não inflar medalhas de time
-            # Seleciona apenas as combinações únicas de (NOC, Event, Medal) antes de contar
+            # Conta eventos distintos para evitar duplicação em esportes coletivos
             query = """
                 SELECT NOC, Medal, COUNT(*) as Count
                 FROM (
@@ -121,7 +113,6 @@ def get_map_stats(
                 query += " AND Sport = ?"
                 params.append(sport)
 
-            # Fecha a subquery e agrupa
             query += ") GROUP BY NOC, Medal"
             
             df = pd.read_sql_query(query, conn, params=params)
@@ -164,9 +155,9 @@ def get_gender_stats(
     sport: Optional[str] = None,
     medal_type: Optional[str] = None
 ):
+    """Retorna distribuição de atletas por gênero."""
     try:
         with data_loader.get_connection_context() as conn:
-            # Contar atletas únicos por sexo
             query = """
                 SELECT Sex, COUNT(DISTINCT ID) as Count
                 FROM athletes
@@ -219,6 +210,7 @@ def get_biometrics(
     sex: Optional[str] = None,
     country: Optional[str] = None
 ):
+    """Retorna dados de altura e peso dos atletas."""
     try:
         with data_loader.get_connection_context() as conn:
             query = """
@@ -244,7 +236,6 @@ def get_biometrics(
                 query += " AND Sport = ?"
                 params.append(sport)
             
-            # Performance fix: Removed ORDER BY RANDOM() which is very slow on large tables
             query += " LIMIT 2000"
             
             df = pd.read_sql_query(query, conn, params=params)
@@ -267,6 +258,7 @@ def get_evolution(
     country: Optional[str] = None,
     sport: Optional[str] = None 
 ):
+    """Retorna evolução de medalhas ao longo dos anos."""
     try:
         with data_loader.get_connection_context() as conn:
             target_countries = []
@@ -276,7 +268,7 @@ def get_evolution(
                 target_countries = countries
             
             if not target_countries:
-                # 1. Definir Top 10 com base na contagem CORRETA (deduplicada)
+                # Busca os 10 países com mais medalhas
                 base_query = """
                     SELECT NOC, COUNT(*) as Medals 
                     FROM (
@@ -298,10 +290,11 @@ def get_evolution(
                 base_query += ") GROUP BY NOC ORDER BY Medals DESC LIMIT 10"
                 
                 df_top = pd.read_sql_query(base_query, conn, params=params)
-                if df_top.empty: return []
+                if df_top.empty: 
+                    return []
                 target_countries = df_top['NOC'].tolist()
 
-            # 2. Evolução com contagem correta
+            # Busca evolução por ano
             evo_query = f"""
                 SELECT Year, NOC, COUNT(*) as Medals
                 FROM (
@@ -325,7 +318,8 @@ def get_evolution(
             evo_query += ") GROUP BY Year, NOC ORDER BY Year"
             
             df_evo = pd.read_sql_query(evo_query, conn, params=evo_params)
-            if df_evo.empty: return []
+            if df_evo.empty: 
+                return []
 
             pivot = df_evo.pivot(index='Year', columns='NOC', values='Medals').fillna(0).reset_index()
             return pivot.to_dict(orient='records')
@@ -343,16 +337,12 @@ def get_medal_table(
     country: Optional[str] = None,
     sport: Optional[str] = None
 ):
+    """Retorna quadro de medalhas."""
     try:
         with data_loader.get_connection_context() as conn:
+            # Agrupa por esporte se país específico, senão por país
             group_col = 'Sport' if (country and country != "All") else 'NOC'
             
-            # Query com deduplicação para contagem correta
-            # Nota: Se group_col for Sport, deduplicamos por (Sport, Event, Medal)
-            # Se for NOC, deduplicamos por (NOC, Event, Medal)
-            
-            # A query abaixo é genérica o suficiente:
-            # Seleciona eventos distintos com suas chaves de agrupamento
             query = f"""
                 SELECT {group_col} as Key, Medal, COUNT(*) as Count
                 FROM (
@@ -430,15 +420,9 @@ def get_top_athletes(
     medal_type: Optional[str] = None,
     limit: int = Query(10, ge=1, le=50)
 ):
+    """Retorna ranking dos atletas mais medalhistas."""
     try:
         with data_loader.get_connection_context() as conn:
-            # Para atletas, a contagem é individual (não deduplica evento de time)
-            # Mas devemos garantir que não estamos duplicando por joins errados
-            # A query anterior estava certa, mas vou usar uma versão segura
-            # que considera DISTINCT Year, Season, Event para o mesmo atleta
-            # para evitar duplicação caso o dataset tenha linhas repetidas sujas
-            
-            # Alias AS id, AS name, AS noc (minúsculas) para facilitar o frontend
             query = """
                 SELECT ID as id, Name as name, NOC as noc,
                     SUM(CASE WHEN Medal = 'Gold' THEN 1 ELSE 0 END) as gold,
@@ -477,14 +461,12 @@ def get_top_athletes(
 
             query += ") GROUP BY ID, Name, NOC"
             
-            # Use as chaves minúsculas na ordenação
             sort_col = medal_type.lower() if medal_type and medal_type != "Total" else 'total'
             query += f" ORDER BY {sort_col} DESC LIMIT ?"
             params.append(limit)
             
             df = pd.read_sql_query(query, conn, params=params)
             
-            # O dataframe já virá com colunas 'id', 'name', 'noc', 'gold', 'silver', 'bronze', 'total'
             return df.to_dict(orient='records')
             
     except Exception as e:
@@ -493,9 +475,10 @@ def get_top_athletes(
 
 @router.get("/athletes/search")
 def search_athletes(
-    query: str = Query(..., min_length=2, description="Nome do atleta para buscar"),
+    query: str = Query(..., min_length=2, description="Nome do atleta"),
     limit: int = Query(20, ge=1, le=100)
 ):
+    """Busca atletas pelo nome."""
     try:
         with data_loader.get_connection_context() as conn:
             sql = """
@@ -510,6 +493,7 @@ def search_athletes(
             if df.empty:
                 return []
             
+            # Prioriza nomes que começam com o termo buscado
             df['starts_with'] = df['Name'].str.lower().str.startswith(query.lower())
             df = df.sort_values(['starts_with', 'Name'], ascending=[False, True]).head(limit)
             
@@ -528,6 +512,7 @@ def search_athletes(
 
 @router.get("/athletes/{athlete_id}")
 def get_athlete_profile(athlete_id: int):
+    """Retorna perfil completo de um atleta."""
     try:
         with data_loader.get_connection_context() as conn:
             query = "SELECT * FROM athletes WHERE ID = ?"
@@ -581,6 +566,7 @@ def get_athlete_profile(athlete_id: int):
 
 @router.get("/athletes/{athlete_id}/stats")
 def get_athlete_stats(athlete_id: int):
+    """Retorna estatísticas detalhadas de um atleta."""
     try:
         with data_loader.get_connection_context() as conn:
             query = "SELECT * FROM athletes WHERE ID = ?"

@@ -10,9 +10,9 @@ interface MedalTableProps {
   data: MedalStat[];
   title: string;
   onExpand?: () => void;
+  isLoading?: boolean;
 }
 
-// Verificar se é um código de país (NOC) - tipicamente 3 letras maiúsculas
 const isCountryCode = (code: string): boolean => {
   return /^[A-Z]{3}$/.test(code);
 };
@@ -37,10 +37,9 @@ const MedalRow = memo(({ row, index, displayName, showFlag }: { row: MedalStat; 
 
 MedalRow.displayName = 'MedalRow';
 
-function MedalTable({ data, title, onExpand }: MedalTableProps) {
+function MedalTable({ data, title, onExpand, isLoading = false }: MedalTableProps) {
   const { t, tCountry, tSport } = useLanguage();
 
-  // Pré-calcular os nomes traduzidos e se devemos mostrar bandeiras
   const translatedData = useMemo(() => {
     return data.map(row => {
       let displayName = row.name;
@@ -61,10 +60,47 @@ function MedalTable({ data, title, onExpand }: MedalTableProps) {
     });
   }, [data, tCountry, tSport]);
 
+  const shimmerClass = "relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/60 before:to-transparent";
+
+  const renderSkeletonRows = () => (
+    <>
+      {[...Array(8)].map((_, i) => (
+        <tr key={i} className="animate-pulse">
+          <td className="px-4 py-3 text-center">
+            <div className={`w-6 h-4 bg-slate-200 rounded mx-auto ${shimmerClass}`} />
+          </td>
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-6 h-4 bg-slate-200 rounded ${shimmerClass}`} />
+              <div className={`w-24 h-4 bg-slate-200 rounded ${shimmerClass}`} style={{ animationDelay: `${i * 50}ms` }} />
+            </div>
+          </td>
+          <td className="px-2 py-3 text-center bg-yellow-50/30">
+            <div className={`w-6 h-4 bg-yellow-100 rounded mx-auto ${shimmerClass}`} />
+          </td>
+          <td className="px-2 py-3 text-center bg-slate-50/30">
+            <div className={`w-6 h-4 bg-slate-100 rounded mx-auto ${shimmerClass}`} />
+          </td>
+          <td className="px-2 py-3 text-center bg-amber-50/30">
+            <div className={`w-6 h-4 bg-amber-100 rounded mx-auto ${shimmerClass}`} />
+          </td>
+          <td className="px-4 py-3 text-center">
+            <div className={`w-8 h-4 bg-slate-200 rounded mx-auto ${shimmerClass}`} />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-300">
       <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-        <h2 className="font-bold text-slate-800 text-lg">{title}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-bold text-slate-800 text-lg">{title}</h2>
+          {isLoading && (
+            <div className="w-4 h-4 border-2 border-olympic-blue border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
         {onExpand && (
           <button
             onClick={onExpand}
@@ -92,7 +128,9 @@ function MedalTable({ data, title, onExpand }: MedalTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {translatedData.length > 0 ? (
+            {isLoading ? (
+              renderSkeletonRows()
+            ) : translatedData.length > 0 ? (
               translatedData.map((row, index) => (
                 <MedalRow
                   key={row.code}

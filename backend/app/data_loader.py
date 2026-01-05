@@ -4,11 +4,11 @@ import os
 import contextlib
 from typing import Optional, List
 
-# Caminhos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "olympics.db")
 
 class DataLoader:
+    """Classe singleton para carregar e consultar dados olímpicos."""
     _instance = None
     
     def __new__(cls):
@@ -17,14 +17,14 @@ class DataLoader:
         return cls._instance
 
     def get_connection(self):
-        """Retorna uma conexão crua (Cuidado: deve ser fechada manualmente)."""
+        """Retorna conexão com o banco SQLite."""
         if not os.path.exists(DB_PATH):
-            raise FileNotFoundError(f"Banco de dados não encontrado em {DB_PATH}. Execute scripts/convert_to_sqlite.py primeiro.")
+            raise FileNotFoundError(f"Banco de dados não encontrado em {DB_PATH}")
         return sqlite3.connect(DB_PATH)
 
     @contextlib.contextmanager
     def get_connection_context(self):
-        """Context manager que garante o fechamento da conexão."""
+        """Context manager para conexão com fechamento automático."""
         conn = self.get_connection()
         try:
             yield conn
@@ -42,6 +42,7 @@ class DataLoader:
         end_year: Optional[int] = None,
         countries: Optional[List[str]] = None
     ) -> pd.DataFrame:
+        """Executa consulta filtrada na tabela de atletas."""
         query = "SELECT * FROM athletes WHERE 1=1"
         params = []
 
@@ -82,6 +83,7 @@ class DataLoader:
             return pd.DataFrame() 
 
     def get_unique_values(self, column: str) -> List:
+        """Retorna valores únicos de uma coluna."""
         try:
             with self.get_connection_context() as conn:
                 query = f"SELECT DISTINCT {column} FROM athletes ORDER BY {column}"
@@ -92,6 +94,7 @@ class DataLoader:
             return []
 
     def get_year_season_map(self):
+        """Retorna mapeamento de ano para temporadas disponíveis."""
         try:
             with self.get_connection_context() as conn:
                 query = "SELECT DISTINCT Year, Season FROM athletes"
@@ -101,6 +104,7 @@ class DataLoader:
             return {}
 
     def get_noc_map(self):
+        """Retorna mapeamento de código NOC para nome do país."""
         try:
             with self.get_connection_context() as conn:
                 query = "SELECT DISTINCT NOC, Team FROM athletes"

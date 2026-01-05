@@ -23,7 +23,7 @@ export default function RangeSlider({ min, max, value, onChange, label }: RangeS
           type="range"
           min={min}
           max={max}
-          step={4} // Olimpíadas são de 4 em 4
+          step={4}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-olympic-blue"
@@ -33,4 +33,3 @@ export default function RangeSlider({ min, max, value, onChange, label }: RangeS
     </div>
   );
 }
-

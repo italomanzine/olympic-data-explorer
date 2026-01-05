@@ -109,3 +109,24 @@ tbody tr {
 .animate-scaleIn {
   animation: scaleIn 0.25s ease-out forwards;
 }
+
+/* Animação Shimmer para Loading Skeletons */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Animação de pulse suave para skeletons */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-skeleton-pulse {
+  animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

@@ -23,6 +23,7 @@ jest.mock('../../lib/api', () => ({
   fetchEvolution: jest.fn(),
   fetchMedalTable: jest.fn(),
   fetchTopAthletes: jest.fn(),
+  fetchGenderStats: jest.fn(),
   fetchAthleteProfile: jest.fn(),
   fetchAthleteStats: jest.fn(),
   searchAthletes: jest.fn(),
@@ -53,9 +54,30 @@ jest.mock('../../components/charts/TopAthletesChart', () => {
   };
 });
 
+jest.mock('../../components/charts/GenderPieChart', () => {
+  return function MockGenderPieChart({ data }: { data: unknown[] }) {
+    return <div data-testid="gender-pie-chart">GenderPieChart ({data?.length || 0} items)</div>;
+  };
+});
+
 jest.mock('../../components/MedalTable', () => {
-  return function MockMedalTable({ data, title }: { data: unknown[]; title: string }) {
-    return <div data-testid="medal-table">{title} ({data?.length || 0} items)</div>;
+  return function MockMedalTable({ data, title, isLoading }: { data: unknown[]; title: string; isLoading?: boolean }) {
+    return (
+      <div data-testid="medal-table">
+        {title} ({data?.length || 0} items)
+        {isLoading && <span data-testid="medal-table-loading">Loading...</span>}
+      </div>
+    );
+  };
+});
+
+jest.mock('../../components/ui/ChartSkeleton', () => {
+  return function MockChartSkeleton({ variant, message }: { variant?: string; message?: string }) {
+    return (
+      <div data-testid={`chart-skeleton-${variant || 'default'}`}>
+        {message && <span>{message}</span>}
+      </div>
+    );
   };
 });
 
@@ -100,6 +122,7 @@ import {
   fetchEvolution,
   fetchMedalTable,
   fetchTopAthletes,
+  fetchGenderStats,
   fetchAthleteProfile,
   fetchAthleteStats,
 } from '../../lib/api';
@@ -110,6 +133,7 @@ const mockFetchBiometrics = fetchBiometrics as jest.Mock;
 const mockFetchEvolution = fetchEvolution as jest.Mock;
 const mockFetchMedalTable = fetchMedalTable as jest.Mock;
 const mockFetchTopAthletes = fetchTopAthletes as jest.Mock;
+const mockFetchGenderStats = fetchGenderStats as jest.Mock;
 const mockFetchAthleteProfile = fetchAthleteProfile as jest.Mock;
 const mockFetchAthleteStats = fetchAthleteStats as jest.Mock;
 
@@ -279,6 +303,7 @@ describe('Dashboard with user interactions', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -435,6 +460,7 @@ describe('Dashboard year filtering', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -555,6 +581,7 @@ describe('Dashboard athlete selection', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
     mockFetchAthleteProfile.mockResolvedValue(mockAthleteProfile);
     mockFetchAthleteStats.mockResolvedValue(mockAthleteStats);
   });
@@ -751,6 +778,7 @@ describe('Dashboard timeline player', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -943,6 +971,7 @@ describe('Dashboard medal type badges', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -1051,6 +1080,7 @@ describe('Dashboard playback and prefetch', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -1160,6 +1190,7 @@ describe('Dashboard error states during data fetch', () => {
     (fetchEvolution as jest.Mock).mockResolvedValue([]);
     (fetchMedalTable as jest.Mock).mockResolvedValue([]);
     (fetchTopAthletes as jest.Mock).mockResolvedValue([]);
+    (fetchGenderStats as jest.Mock).mockResolvedValue([]);
     
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     
@@ -1174,18 +1205,33 @@ describe('Dashboard error states during data fetch', () => {
       await Promise.resolve();
     });
 
-    // Make next fetch fail
-    (fetchMapStats as jest.Mock).mockRejectedValue(new Error('Network error'));
-
     // Find and click play button
     const buttons = screen.getAllByRole('button');
     const playButton = buttons.find(btn => btn.className.includes('rounded-full'));
     
     if (playButton) {
+      // Make next fetch fail before clicking play
+      (fetchMapStats as jest.Mock).mockImplementation(() => 
+        Promise.reject(new Error('Network error'))
+      );
+      (fetchBiometrics as jest.Mock).mockImplementation(() => 
+        Promise.reject(new Error('Network error'))
+      );
+      (fetchMedalTable as jest.Mock).mockImplementation(() => 
+        Promise.reject(new Error('Network error'))
+      );
+      (fetchTopAthletes as jest.Mock).mockImplementation(() => 
+        Promise.reject(new Error('Network error'))
+      );
+      (fetchGenderStats as jest.Mock).mockImplementation(() => 
+        Promise.reject(new Error('Network error'))
+      );
+      
       await user.click(playButton);
       
       await act(async () => {
         jest.advanceTimersByTime(1500);
+        await Promise.resolve();
         await Promise.resolve();
         await Promise.resolve();
       });

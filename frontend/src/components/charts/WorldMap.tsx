@@ -6,11 +6,10 @@ import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simp
 import { scaleLinear } from "d3-scale";
 import { useLanguage } from "../../contexts/LanguageContext";
 
-// Mapa com ISO Alpha-3 codes via CDN confiável
 const GEO_URL = "https://cdn.jsdelivr.net/gh/holtzy/D3-graph-gallery@master/DATA/world.geojson";
 
 interface MapData {
-  id: string; // NOC code (USA, BRA)
+  id: string;
   total: number;
   gold: number;
   silver: number;
@@ -21,7 +20,6 @@ interface WorldMapProps {
   data: MapData[];
 }
 
-// Função para calcular posição do tooltip evitando sair da tela
 export function calculateTooltipPosition(
   mouseX: number, 
   mouseY: number, 
@@ -34,22 +32,18 @@ export function calculateTooltipPosition(
   let left = mouseX + cursorOffset;
   let top = mouseY + cursorOffset;
   
-  // Ajusta se ultrapassa a borda direita
   if (left + tooltipWidth > window.innerWidth - padding) {
     left = mouseX - tooltipWidth - cursorOffset;
   }
   
-  // Ajusta se ultrapassa a borda inferior
   if (top + tooltipHeight > window.innerHeight - padding) {
     top = mouseY - tooltipHeight - cursorOffset;
   }
   
-  // Garante que não saia pela esquerda
   if (left < padding) {
     left = padding;
   }
   
-  // Garante que não saia pelo topo
   if (top < padding) {
     top = padding;
   }
@@ -57,7 +51,6 @@ export function calculateTooltipPosition(
   return { left, top };
 }
 
-// Componente de Tooltip renderizado via Portal
 interface TooltipProps {
   content: { name: string; stats?: MapData; x: number; y: number };
   t: (key: string) => string;
@@ -66,7 +59,6 @@ interface TooltipProps {
 function TooltipPortal({ content, t }: TooltipProps) {
   const pos = calculateTooltipPosition(content.x, content.y);
 
-  // Verifica se estamos no cliente (necessário para createPortal)
   if (typeof window === 'undefined') return null;
 
   return createPortal(
@@ -114,7 +106,6 @@ function WorldMap({ data }: WorldMapProps) {
     y: number;
   } | null>(null);
 
-  // Criar um Map para lookup O(1) em vez de find O(n)
   const dataMap = useMemo(() => {
     const map = new Map<string, MapData>();
     data.forEach(d => map.set(d.id, d));
@@ -152,7 +143,6 @@ function WorldMap({ data }: WorldMapProps) {
           <Geographies geography={GEO_URL}>
             {({ geographies }) =>
               geographies.map((geo) => {
-                // Tenta obter o ID de várias formas
                 const countryId = geo.id || geo.properties?.ISO_A3 || geo.properties?.name; 
                 const countryName = geo.properties?.name || countryId;
                 
@@ -198,10 +188,8 @@ function WorldMap({ data }: WorldMapProps) {
         </ZoomableGroup>
       </ComposableMap>
       
-      {/* Tooltip Flutuante via Portal - renderizado fora do container */}
       {tooltipContent && <TooltipPortal content={tooltipContent} t={t} />}
 
-      {/* Legenda de Gradiente Responsiva */}
       <div className="absolute bottom-2 sm:bottom-4 md:bottom-8 lg:bottom-12 left-2 sm:left-auto sm:right-4 md:right-8 lg:right-12 bg-white/95 backdrop-blur p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl shadow-md border border-slate-100 flex flex-col gap-1 sm:gap-2 min-w-[140px] sm:min-w-[180px] md:min-w-[220px] z-10">
         <div className="flex justify-between items-center text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           <span>{t('few_medals')}</span>

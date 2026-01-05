@@ -13,21 +13,19 @@ interface EvolutionChartProps {
   data: EvolutionData[];
 }
 
-// Paleta de 10 cores distintas e vibrantes
 const COLORS = [
-  "#2563EB", // blue-600
-  "#DC2626", // red-600
-  "#16A34A", // green-600
-  "#CA8A04", // yellow-600
-  "#9333EA", // purple-600
-  "#EA580C", // orange-600
-  "#0891B2", // cyan-600
-  "#DB2777", // pink-600
-  "#4F46E5", // indigo-600
-  "#65A30D", // lime-600
+  "#2563EB",
+  "#DC2626",
+  "#16A34A",
+  "#CA8A04",
+  "#9333EA",
+  "#EA580C",
+  "#0891B2",
+  "#DB2777",
+  "#4F46E5",
+  "#65A30D",
 ];
 
-// Mapeamento de países que mudaram de nome/código
 const COUNTRY_NOTES: Record<string, string> = {
   'URS': 'URSS (→ RUS em 1992)',
   'RUS': 'Rússia (ex-URSS)',
@@ -39,7 +37,6 @@ const COUNTRY_NOTES: Record<string, string> = {
   'ROC': 'Comitê Olímpico Russo',
 };
 
-// Exported for testing
 export const CustomTooltip = memo(({ active, payload, label }: any) => {
   const { t } = useLanguage();
   
@@ -71,7 +68,6 @@ export const CustomTooltip = memo(({ active, payload, label }: any) => {
 
 CustomTooltip.displayName = 'CustomTooltip';
 
-// Exported for testing
 export const CustomLegend = memo(({ payload, hiddenKeys, toggleKey }: any) => {
   return (
     <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-2 py-1">
@@ -121,7 +117,6 @@ function EvolutionChart({ data }: EvolutionChartProps) {
     );
   };
 
-  // Verifica se há países com notas históricas
   const hasHistoricalNotes = useMemo(() => {
     return keys.some(key => COUNTRY_NOTES[key]);
   }, [keys]);
@@ -171,7 +166,6 @@ function EvolutionChart({ data }: EvolutionChartProps) {
         </ResponsiveContainer>
       </div>
       
-      {/* Nota sobre países históricos */}
       {hasHistoricalNotes && (
         <div className="text-[10px] text-slate-400 text-center pb-1 px-2">
           * Países com mudanças históricas de nome/código. Clique na legenda para ocultar/exibir.

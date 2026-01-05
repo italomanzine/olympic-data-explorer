@@ -2,13 +2,11 @@ export type Language = 'pt-BR' | 'en' | 'es' | 'fr' | 'zh';
 
 export const translations: Record<Language, Record<string, string>> = {
   'pt-BR': {
-    // UI Geral
     app_title: "Dashboard Olímpico",
     loading: "Processando...",
     online: "Online",
     status: "Status do Sistema",
     
-    // Filtros Sidebar
     season: "Temporada",
     summer: "Verão",
     winter: "Inverno",
@@ -25,29 +23,24 @@ export const translations: Record<Language, Record<string, string>> = {
     all_sports: "Todas as Modalidades",
     affects_charts: "Afeta Evolução e Biometria.",
     
-    // Gráficos Títulos
     map_title: "Mapa Global de Medalhas",
     evolution_title: "Evolução Histórica (Top 10)",
     evolution_country: "Evolução:",
     biometrics_title: "Biometria:",
     biometrics_general: "Geral",
     
-    // Mapa / Legenda
     many_medals: "Muitas Medalhas",
     few_medals: "Poucas/Nenhuma",
     no_data: "Sem dados",
     
-    // Timeline
     edition: "EDIÇÃO",
     
-    // Quadro de Medalhas
     medal_table_title: "Quadro de Medalhas",
     medal_table_sport: "Medalhas por Esporte",
     name_col: "NOME",
     total_col: "TOTAL",
     no_medals_found: "Nenhuma medalha encontrada com estes filtros.",
     
-    // Tooltips
     gold: "Ouro",
     silver: "Prata",
     bronze: "Bronze",
@@ -57,7 +50,6 @@ export const translations: Record<Language, Record<string, string>> = {
     weight: "Peso",
     height: "Altura",
     
-    // Busca de Atleta
     athlete: "Atleta",
     search_athlete: "Buscar atleta por nome...",
     no_athletes_found: "Nenhum atleta encontrado",
@@ -70,7 +62,6 @@ export const translations: Record<Language, Record<string, string>> = {
     expand: "Expandir",
     all_editions: "Todas as edições",
     
-    // Novos filtros e gráfico de top atletas
     top_athletes_title: "Top 10 Atletas Medalhistas",
     all_years: "Todos os Anos",
     medal_filter: "Medalha",
@@ -79,7 +70,6 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_silver: "Prata",
     filter_bronze: "Bronze",
     
-    // Gráfico de Pizza
     gender_distribution: "Distribuição por Gênero",
     athletes: "atletas",
   },
@@ -126,7 +116,6 @@ export const translations: Record<Language, Record<string, string>> = {
     weight: "Weight",
     height: "Height",
     
-    // Athlete Search
     athlete: "Athlete",
     search_athlete: "Search athlete by name...",
     no_athletes_found: "No athlete found",
@@ -139,7 +128,6 @@ export const translations: Record<Language, Record<string, string>> = {
     expand: "Expand",
     all_editions: "All editions",
     
-    // New filters and top athletes chart
     top_athletes_title: "Top 10 Medal Athletes",
     all_years: "All Years",
     medal_filter: "Medal",
@@ -148,7 +136,6 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_silver: "Silver",
     filter_bronze: "Bronze",
     
-    // Pie Chart
     gender_distribution: "Gender Distribution",
     athletes: "athletes",
   },
@@ -195,7 +182,6 @@ export const translations: Record<Language, Record<string, string>> = {
     weight: "Peso",
     height: "Altura",
     
-    // Búsqueda de Atleta
     athlete: "Atleta",
     search_athlete: "Buscar atleta por nombre...",
     no_athletes_found: "Ningún atleta encontrado",
@@ -208,7 +194,6 @@ export const translations: Record<Language, Record<string, string>> = {
     expand: "Expandir",
     all_editions: "Todas las ediciones",
     
-    // Nuevos filtros y gráfico de top atletas
     top_athletes_title: "Top 10 Atletas Medallistas",
     all_years: "Todos los Años",
     medal_filter: "Medalla",
@@ -217,7 +202,6 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_silver: "Plata",
     filter_bronze: "Bronce",
     
-    // Gráfico Circular
     gender_distribution: "Distribución por Género",
     athletes: "atletas",
   },
@@ -264,7 +248,6 @@ export const translations: Record<Language, Record<string, string>> = {
     weight: "Poids",
     height: "Taille",
     
-    // Recherche d'Athlète
     athlete: "Athlète",
     search_athlete: "Rechercher un athlète...",
     no_athletes_found: "Aucun athlète trouvé",
@@ -277,7 +260,6 @@ export const translations: Record<Language, Record<string, string>> = {
     expand: "Agrandir",
     all_editions: "Toutes les éditions",
     
-    // Nouveaux filtres et graphique des meilleurs athlètes
     top_athletes_title: "Top 10 Athlètes Médaillés",
     all_years: "Toutes les Années",
     medal_filter: "Médaille",
@@ -286,7 +268,6 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_silver: "Argent",
     filter_bronze: "Bronze",
     
-    // Camembert
     gender_distribution: "Répartition par Sexe",
     athletes: "athlètes",
   },
@@ -333,7 +314,6 @@ export const translations: Record<Language, Record<string, string>> = {
     weight: "重量",
     height: "身高",
     
-    // 运动员搜索
     athlete: "运动员",
     search_athlete: "搜索运动员...",
     no_athletes_found: "未找到运动员",
@@ -346,7 +326,6 @@ export const translations: Record<Language, Record<string, string>> = {
     expand: "展开",
     all_editions: "所有版本",
     
-    // 新筛选器和顶级运动员图表
     top_athletes_title: "前10名奖牌运动员",
     all_years: "所有年份",
     medal_filter: "奖牌",
@@ -355,13 +334,11 @@ export const translations: Record<Language, Record<string, string>> = {
     filter_silver: "银牌",
     filter_bronze: "铜牌",
     
-    // 饼图
     gender_distribution: "性别分布",
     athletes: "运动员",
   }
 };
 
-// Traduções de Esportes
 export const sportTranslations: Record<string, Record<string, string>> = {
   'pt-BR': {
     'Swimming': 'Natação', 'Athletics': 'Atletismo', 'Football': 'Futebol', 'Basketball': 'Basquete',
@@ -421,7 +398,6 @@ export const sportTranslations: Record<string, Record<string, string>> = {
   }
 };
 
-// Traduções de Países (NOC)
 export const countryTranslations: Record<string, Record<string, string>> = {
   'pt-BR': {
     'USA': 'Estados Unidos', 'BRA': 'Brasil', 'CHN': 'China', 'RUS': 'Rússia', 'GER': 'Alemanha',

@@ -1,32 +1,29 @@
+"""Script para converter CSV de atletas olímpicos para SQLite."""
 import pandas as pd
 import sqlite3
 import os
 
-# Caminhos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(BASE_DIR, "data", "athlete_events.csv")
 DB_PATH = os.path.join(BASE_DIR, "data", "olympics.db")
 
 def convert_csv_to_sqlite():
+    """Converte o arquivo CSV para banco SQLite."""
     if not os.path.exists(CSV_PATH):
         print(f"Erro: Arquivo CSV não encontrado em {CSV_PATH}")
         return
 
     print(f"Convertendo '{CSV_PATH}' para '{DB_PATH}'...")
     
-    # Remove banco antigo se existir
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
 
-    # Conecta ao SQLite
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Ler e inserir em chunks para economizar memória
     chunk_size = 10000
     total_rows = 0
     
-    # Tenta encodings
     encodings = ['utf-8', 'latin-1']
     success = False
     
@@ -35,19 +32,15 @@ def convert_csv_to_sqlite():
             print(f"Tentando ler CSV com encoding {encoding}...")
             with pd.read_csv(CSV_PATH, chunksize=chunk_size, encoding=encoding) as reader:
                 for i, chunk in enumerate(reader):
-                    # Limpezas básicas (equivalente ao data_loader antigo)
                     if 'Medal' in chunk.columns:
                         chunk['Medal'] = chunk['Medal'].fillna('No Medal')
                     
                     if 'Name' in chunk.columns:
-                        # Patch específico
                         mask_talo = chunk['Name'].str.startswith('talo Manzine', na=False)
                         if mask_talo.any():
                             chunk.loc[mask_talo, 'Name'] = chunk.loc[mask_talo, 'Name'].str.replace(r'^talo Manzine', 'Ítalo Manzine', regex=True)
                         chunk['Name'] = chunk['Name'].str.strip()
                     
-                    # Salvar no banco
-                    # if_exists='append' adiciona ao final da tabela
                     chunk.to_sql('athletes', conn, if_exists='append', index=False)
                     total_rows += len(chunk)
                     print(f"Processado chunk {i+1} ({total_rows} linhas)...")
@@ -62,7 +55,6 @@ def convert_csv_to_sqlite():
 
     if success:
         print("Criando índices para performance...")
-        # Índices nas colunas de filtro
         cursor.execute("CREATE INDEX idx_year ON athletes (Year)")
         cursor.execute("CREATE INDEX idx_season ON athletes (Season)")
         cursor.execute("CREATE INDEX idx_noc ON athletes (NOC)")
@@ -80,4 +72,3 @@ def convert_csv_to_sqlite():
 
 if __name__ == "__main__":
     convert_csv_to_sqlite()
-

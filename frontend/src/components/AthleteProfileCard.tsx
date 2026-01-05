@@ -17,7 +17,6 @@ function AthleteProfileCard({ profile, onClose }: AthleteProfileCardProps) {
   
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Header */}
       <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white p-4 relative">
         <button
           onClick={onClose}
@@ -40,7 +39,6 @@ function AthleteProfileCard({ profile, onClose }: AthleteProfileCardProps) {
         </div>
       </div>
 
-      {/* Medals Summary */}
       <div className="grid grid-cols-4 gap-2 p-4 bg-slate-50 border-b border-slate-100">
         <div className="text-center">
           <div className="w-10 h-10 mx-auto rounded-full bg-yellow-100 flex items-center justify-center mb-1">
@@ -72,9 +70,7 @@ function AthleteProfileCard({ profile, onClose }: AthleteProfileCardProps) {
         </div>
       </div>
 
-      {/* Info Grid */}
       <div className="p-4 space-y-4">
-        {/* Biometrics */}
         <div className="grid grid-cols-3 gap-3">
           {profile.height && (
             <div className="flex items-center gap-2 text-sm">
@@ -96,7 +92,6 @@ function AthleteProfileCard({ profile, onClose }: AthleteProfileCardProps) {
           </div>
         </div>
 
-        {/* Sports */}
         <div>
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
             {t('sports_practiced')}
@@ -113,7 +108,6 @@ function AthleteProfileCard({ profile, onClose }: AthleteProfileCardProps) {
           </div>
         </div>
 
-        {/* Participations */}
         <div>
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
             {t('olympic_participations')} ({profile.participations.length})

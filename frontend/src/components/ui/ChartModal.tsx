@@ -13,7 +13,6 @@ interface ChartModalProps {
 }
 
 export default function ChartModal({ isOpen, onClose, title, subtitle, children }: ChartModalProps) {
-  // Fechar com ESC
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
       onClose();
@@ -38,15 +37,12 @@ export default function ChartModal({ isOpen, onClose, title, subtitle, children 
       className="fixed inset-0 z-100 flex items-center justify-center p-4 sm:p-6 md:p-8"
       onClick={onClose}
     >
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fadeIn" />
       
-      {/* Modal */}
       <div 
         className="relative w-full h-full max-w-[95vw] max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scaleIn"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-linear-to-br from-olympic-blue to-blue-600 flex items-center justify-center">
@@ -68,14 +64,12 @@ export default function ChartModal({ isOpen, onClose, title, subtitle, children 
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 p-6 overflow-auto min-h-0">
           <div className="w-full h-full min-h-[500px]">
             {children}
           </div>
         </div>
 
-        {/* Footer hint */}
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
           <p className="text-xs text-slate-400 text-center">
             Pressione <kbd className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-600 font-mono text-[10px]">ESC</kbd> ou clique fora para fechar
@@ -87,7 +81,6 @@ export default function ChartModal({ isOpen, onClose, title, subtitle, children 
   );
 }
 
-// Botão de maximizar para usar nos headers dos gráficos
 interface MaximizeButtonProps {
   onClick: () => void;
   label?: string;

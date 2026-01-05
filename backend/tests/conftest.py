@@ -1,6 +1,4 @@
-"""
-Configurações e fixtures compartilhadas para testes
-"""
+"""Configurações e fixtures para testes."""
 import pytest
 from fastapi.testclient import TestClient
 import pandas as pd
@@ -12,13 +10,13 @@ from app.data_loader import DataLoader
 
 @pytest.fixture(scope="session")
 def client():
-    """Cliente de teste para API FastAPI"""
+    """Cliente de teste para API FastAPI."""
     return TestClient(app)
 
 
 @pytest.fixture
 def sample_dataframe():
-    """DataFrame de exemplo para testes unitários"""
+    """DataFrame de exemplo para testes unitários."""
     return pd.DataFrame({
         'ID': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'Name': [
@@ -42,7 +40,7 @@ def sample_dataframe():
 
 @pytest.fixture
 def empty_dataframe():
-    """DataFrame vazio para testes de cenários sem dados"""
+    """DataFrame vazio para testes de cenários sem dados."""
     return pd.DataFrame(columns=[
         'ID', 'Name', 'Sex', 'Age', 'Height', 'Weight',
         'Team', 'NOC', 'Year', 'Season', 'City', 'Sport', 'Event', 'Medal'
@@ -51,7 +49,7 @@ def empty_dataframe():
 
 @pytest.fixture
 def medals_only_dataframe():
-    """DataFrame apenas com medalhas (sem 'No Medal')"""
+    """DataFrame apenas com medalhas (sem 'No Medal')."""
     return pd.DataFrame({
         'ID': [1, 2, 3, 4, 5],
         'Name': ['Athlete A', 'Athlete B', 'Athlete C', 'Athlete D', 'Athlete E'],
@@ -71,11 +69,9 @@ def medals_only_dataframe():
 
 
 @pytest.fixture(autouse=True)
-def reset_data_loader():
-    """
-    Reset do DataLoader antes de cada teste para garantir isolamento.
-    Não reseta em testes de integração que precisam dos dados reais.
-    """
+def reset_cache():
+    """Limpa o cache de respostas antes de cada teste."""
+    from app.api import RESPONSE_CACHE
+    RESPONSE_CACHE.clear()
     yield
-    # Após o teste, podemos limpar o cache se necessário
-    # DataLoader._df = None  # Descomente se quiser resetar após cada teste
+    RESPONSE_CACHE.clear()

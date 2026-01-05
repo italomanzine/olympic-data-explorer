@@ -1,265 +1,293 @@
-"""
-Testes completos para o módulo data_loader
-Cobrindo todos os cenários: CSV existe, não existe, diferentes encodings, mock data
-"""
+"""Testes para o módulo data_loader."""
 import pytest
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 import pandas as pd
 import numpy as np
 import os
+import sqlite3
 
-from app.data_loader import DataLoader, generate_mock_data, DATA_PATH
-
-
-class TestGenerateMockData:
-    """Testes para a função generate_mock_data"""
-    
-    def test_generate_mock_data_default(self):
-        """Teste com número padrão de linhas"""
-        df = generate_mock_data()
-        assert len(df) == 1000
-    
-    def test_generate_mock_data_custom_rows(self):
-        """Teste com número customizado de linhas"""
-        df = generate_mock_data(rows=500)
-        assert len(df) == 500
-    
-    def test_generate_mock_data_structure(self):
-        """Teste da estrutura do DataFrame gerado"""
-        df = generate_mock_data(rows=10)
-        
-        expected_columns = [
-            'ID', 'Name', 'Sex', 'Age', 'Height', 'Weight',
-            'Team', 'NOC', 'Year', 'Season', 'City', 'Sport', 'Event', 'Medal'
-        ]
-        
-        for col in expected_columns:
-            assert col in df.columns
-    
-    def test_generate_mock_data_values(self):
-        """Teste dos valores gerados"""
-        df = generate_mock_data(rows=100)
-        
-        # IDs são sequenciais começando de 1
-        assert df['ID'].iloc[0] == 1
-        assert df['ID'].iloc[-1] == 100
-        
-        # Sexo é M ou F
-        assert set(df['Sex'].unique()).issubset({'M', 'F'})
-        
-        # Idade entre 18 e 39
-        assert df['Age'].min() >= 18
-        assert df['Age'].max() < 40
-        
-        # Altura entre 150 e 209
-        assert df['Height'].min() >= 150
-        assert df['Height'].max() < 210
-        
-        # Peso entre 45 e 119
-        assert df['Weight'].min() >= 45
-        assert df['Weight'].max() < 120
-        
-        # Season é sempre Summer no mock
-        assert all(df['Season'] == 'Summer')
+from app.data_loader import DataLoader, data_loader, DB_PATH
 
 
 class TestDataLoaderSingleton:
-    """Testes para o padrão Singleton do DataLoader"""
+    """Testes para o padrão Singleton."""
     
     def test_singleton_instance(self):
-        """Teste que DataLoader é um singleton"""
+        """DataLoader é um singleton."""
         loader1 = DataLoader()
         loader2 = DataLoader()
         assert loader1 is loader2
+    
+    def test_data_loader_global_instance(self):
+        """Instância global data_loader."""
+        assert isinstance(data_loader, DataLoader)
 
 
-class TestDataLoaderLoadData:
-    """Testes para o método load_data do DataLoader"""
+class TestDataLoaderConnection:
+    """Testes para conexões."""
     
-    def test_load_data_returns_dataframe(self):
-        """Teste que load_data retorna um DataFrame"""
-        loader = DataLoader()
-        # Resetar o DataFrame para forçar recarregamento
-        loader._df = None
-        
-        df = loader.load_data()
-        assert isinstance(df, pd.DataFrame)
-    
-    def test_load_data_caches_result(self):
-        """Teste que load_data usa cache"""
-        loader = DataLoader()
-        loader._df = None
-        
-        df1 = loader.load_data()
-        df2 = loader.load_data()
-        
-        assert df1 is df2
-    
-    def test_get_df_loads_if_needed(self):
-        """Teste que get_df carrega dados se necessário"""
-        loader = DataLoader()
-        loader._df = None
-        
-        df = loader.get_df()
-        assert isinstance(df, pd.DataFrame)
-    
-    def test_get_df_returns_cached(self):
-        """Teste que get_df retorna dados do cache"""
-        loader = DataLoader()
-        
-        df1 = loader.get_df()
-        df2 = loader.get_df()
-        
-        assert df1 is df2
-
-
-class TestDataLoaderWithMock:
-    """Testes com mock do sistema de arquivos"""
-    
-    def test_load_data_csv_not_found(self):
-        """Teste quando CSV não existe - usa mock data"""
-        loader = DataLoader()
-        loader._df = None
-        
-        with patch('os.path.exists', return_value=False):
-            df = loader.load_data()
-            assert isinstance(df, pd.DataFrame)
-            # Mock data tem Medal preenchido com valores específicos
-            assert 'Medal' in df.columns
-    
-    def test_load_data_csv_with_utf8(self):
-        """Teste de leitura com encoding UTF-8"""
-        loader = DataLoader()
-        loader._df = None
-        
-        mock_df = pd.DataFrame({
-            'ID': [1],
-            'Name': ['Test Athlete'],
-            'Sex': ['M'],
-            'Age': [25],
-            'Height': [180.0],
-            'Weight': [75.0],
-            'Team': ['Test'],
-            'NOC': ['TST'],
-            'Year': [2016],
-            'Season': ['Summer'],
-            'City': ['Rio'],
-            'Sport': ['Test Sport'],
-            'Event': ['Test Event'],
-            'Medal': [np.nan]
-        })
-        
-        with patch('os.path.exists', return_value=True):
-            with patch('pandas.read_csv', return_value=mock_df):
-                df = loader.load_data()
-                assert isinstance(df, pd.DataFrame)
-                # Medal NaN deve ser convertido para 'No Medal'
-                assert df['Medal'].iloc[0] == 'No Medal'
-    
-    def test_load_data_name_correction(self):
-        """Teste de correção de nomes específicos"""
-        loader = DataLoader()
-        loader._df = None
-        
-        mock_df = pd.DataFrame({
-            'ID': [1],
-            'Name': ['talo Manzine Test'],
-            'Sex': ['M'],
-            'Age': [25],
-            'Height': [180.0],
-            'Weight': [75.0],
-            'Team': ['Test'],
-            'NOC': ['TST'],
-            'Year': [2016],
-            'Season': ['Summer'],
-            'City': ['Rio'],
-            'Sport': ['Test Sport'],
-            'Event': ['Test Event'],
-            'Medal': ['Gold']
-        })
-        
-        with patch('os.path.exists', return_value=True):
-            with patch('pandas.read_csv', return_value=mock_df):
-                df = loader.load_data()
-                # Nome deve ser corrigido para 'Ítalo Manzine Test'
-                assert df['Name'].iloc[0] == 'Ítalo Manzine Test'
-    
-    def test_load_data_sex_stripping(self):
-        """Teste de limpeza da coluna Sex"""
-        loader = DataLoader()
-        loader._df = None
-        
-        mock_df = pd.DataFrame({
-            'ID': [1],
-            'Name': ['Test Athlete'],
-            'Sex': ['  M  '],  # Com espaços
-            'Age': [25],
-            'Height': [180.0],
-            'Weight': [75.0],
-            'Team': ['Test'],
-            'NOC': ['TST'],
-            'Year': [2016],
-            'Season': ['Summer'],
-            'City': ['Rio'],
-            'Sport': ['Test Sport'],
-            'Event': ['Test Event'],
-            'Medal': ['Gold']
-        })
-        
-        with patch('os.path.exists', return_value=True):
-            with patch('pandas.read_csv', return_value=mock_df):
-                df = loader.load_data()
-                assert df['Sex'].iloc[0] == 'M'
-    
-    def test_load_data_unicode_error_fallback(self):
-        """Teste de fallback para erros de encoding"""
-        loader = DataLoader()
-        loader._df = None
-        
-        mock_df = pd.DataFrame({
-            'ID': [1],
-            'Name': ['Test'],
-            'Sex': ['M'],
-            'Medal': [np.nan]
-        })
-        
-        def side_effect_read_csv(path, encoding=None, encoding_errors=None):
-            if encoding == 'utf-8':
-                raise UnicodeDecodeError('utf-8', b'', 0, 1, 'mock error')
-            if encoding == 'utf-8-sig':
-                raise UnicodeDecodeError('utf-8-sig', b'', 0, 1, 'mock error')
-            if encoding == 'latin-1' and encoding_errors is None:
-                raise UnicodeDecodeError('latin-1', b'', 0, 1, 'mock error')
-            if encoding == 'cp1252':
-                raise UnicodeDecodeError('cp1252', b'', 0, 1, 'mock error')
-            # Última tentativa com latin-1 e encoding_errors='replace'
-            return mock_df
-        
-        with patch('os.path.exists', return_value=True):
-            with patch('pandas.read_csv', side_effect=side_effect_read_csv):
-                df = loader.load_data()
-                assert isinstance(df, pd.DataFrame)
-
-
-class TestDataLoaderIntegration:
-    """Testes de integração com o arquivo real"""
-    
-    def test_real_data_if_exists(self):
-        """Teste com dados reais se o arquivo existir"""
-        if os.path.exists(DATA_PATH):
+    def test_get_connection_success(self):
+        """Conexão bem sucedida."""
+        if os.path.exists(DB_PATH):
             loader = DataLoader()
-            loader._df = None
-            
-            df = loader.load_data()
+            conn = loader.get_connection()
+            assert conn is not None
+            conn.close()
+    
+    def test_get_connection_file_not_found(self):
+        """Banco de dados não existe."""
+        loader = DataLoader()
+        with patch('os.path.exists', return_value=False):
+            with pytest.raises(FileNotFoundError):
+                loader.get_connection()
+    
+    def test_get_connection_context_success(self):
+        """Context manager de conexão."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            with loader.get_connection_context() as conn:
+                assert conn is not None
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                result = cursor.fetchone()
+                assert result == (1,)
+    
+    def test_get_connection_context_closes_connection(self):
+        """Context manager fecha a conexão."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            with loader.get_connection_context() as conn:
+                pass
+            with pytest.raises(sqlite3.ProgrammingError):
+                conn.cursor()
+
+
+class TestDataLoaderQueries:
+    """Testes para queries."""
+    
+    def test_query_filtered_no_filters(self):
+        """Query sem filtros."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered()
             assert isinstance(df, pd.DataFrame)
             assert len(df) > 0
-            assert 'Medal' in df.columns
-            assert 'Name' in df.columns
-
-
-class TestDataPath:
-    """Testes para o caminho dos dados"""
     
-    def test_data_path_is_relative(self):
-        """Teste que DATA_PATH é construído corretamente"""
-        assert 'data/athlete_events.csv' in DATA_PATH or 'data\\athlete_events.csv' in DATA_PATH
+    def test_query_filtered_with_year(self):
+        """Query com filtro de ano."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(year=2016)
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['Year'] == 2016)
+    
+    def test_query_filtered_with_year_range(self):
+        """Query com intervalo de anos."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(start_year=2008, end_year=2016)
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all((df['Year'] >= 2008) & (df['Year'] <= 2016))
+    
+    def test_query_filtered_with_season(self):
+        """Query com filtro de temporada."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(season='Summer')
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['Season'] == 'Summer')
+    
+    def test_query_filtered_with_season_both(self):
+        """Query com temporada 'Both' (ignora filtro)."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df_both = loader.query_filtered(season='Both')
+            df_none = loader.query_filtered()
+            assert len(df_both) == len(df_none)
+    
+    def test_query_filtered_with_sex(self):
+        """Query com filtro de sexo."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(sex='M')
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['Sex'] == 'M')
+    
+    def test_query_filtered_with_sex_both(self):
+        """Query com sexo 'Both' (ignora filtro)."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df_both = loader.query_filtered(sex='Both')
+            df_none = loader.query_filtered()
+            assert len(df_both) == len(df_none)
+    
+    def test_query_filtered_with_country(self):
+        """Query com filtro de país."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(country='USA')
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['NOC'] == 'USA')
+    
+    def test_query_filtered_with_country_all(self):
+        """Query com país 'All' (ignora filtro)."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df_all = loader.query_filtered(country='All')
+            df_none = loader.query_filtered()
+            assert len(df_all) == len(df_none)
+    
+    def test_query_filtered_with_countries_list(self):
+        """Query com lista de países."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(countries=['USA', 'BRA', 'CHN'])
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['NOC'].isin(['USA', 'BRA', 'CHN']))
+    
+    def test_query_filtered_with_sport(self):
+        """Query com filtro de esporte."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(sport='Swimming')
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['Sport'] == 'Swimming')
+    
+    def test_query_filtered_with_sport_all(self):
+        """Query com esporte 'All' (ignora filtro)."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df_all = loader.query_filtered(sport='All')
+            df_none = loader.query_filtered()
+            assert len(df_all) == len(df_none)
+    
+    def test_query_filtered_multiple_filters(self):
+        """Query com múltiplos filtros."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(year=2016, season='Summer', sex='M', country='USA')
+            assert isinstance(df, pd.DataFrame)
+            if len(df) > 0:
+                assert all(df['Year'] == 2016)
+                assert all(df['Season'] == 'Summer')
+                assert all(df['Sex'] == 'M')
+                assert all(df['NOC'] == 'USA')
+    
+    def test_query_filtered_empty_result(self):
+        """Query com resultado vazio."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            df = loader.query_filtered(year=1800)
+            assert isinstance(df, pd.DataFrame)
+            assert len(df) == 0
+
+
+class TestDataLoaderUniqueValues:
+    """Testes para valores únicos."""
+    
+    def test_get_unique_values_year(self):
+        """Valores únicos para ano."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            years = loader.get_unique_values('Year')
+            assert isinstance(years, list)
+            assert len(years) > 0
+            assert years == sorted(years)
+    
+    def test_get_unique_values_sport(self):
+        """Valores únicos para esporte."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            sports = loader.get_unique_values('Sport')
+            assert isinstance(sports, list)
+            assert len(sports) > 0
+    
+    def test_get_unique_values_invalid_column(self):
+        """Valores únicos para coluna inválida."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            result = loader.get_unique_values('InvalidColumn')
+            assert result == []
+
+
+class TestDataLoaderYearSeasonMap:
+    """Testes para mapeamento ano-temporada."""
+    
+    def test_get_year_season_map(self):
+        """Mapeamento ano-temporada."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            year_season_map = loader.get_year_season_map()
+            assert isinstance(year_season_map, dict)
+            assert len(year_season_map) > 0
+            
+            for year, seasons in year_season_map.items():
+                assert isinstance(seasons, list)
+                for season in seasons:
+                    assert season in ['Summer', 'Winter']
+
+
+class TestDataLoaderNOCMap:
+    """Testes para mapeamento NOC-Nome."""
+    
+    def test_get_noc_map(self):
+        """Mapeamento NOC-Nome."""
+        if os.path.exists(DB_PATH):
+            loader = DataLoader()
+            noc_map = loader.get_noc_map()
+            assert isinstance(noc_map, dict)
+            assert len(noc_map) > 0
+            assert 'USA' in noc_map or 'BRA' in noc_map
+
+
+class TestDataLoaderErrorHandling:
+    """Testes para tratamento de erros."""
+    
+    def test_query_filtered_handles_exception(self):
+        """query_filtered trata exceções."""
+        loader = DataLoader()
+        with patch.object(loader, 'get_connection_context') as mock_ctx:
+            mock_ctx.side_effect = Exception("Erro de conexão")
+            df = loader.query_filtered()
+            assert isinstance(df, pd.DataFrame)
+            assert len(df) == 0
+    
+    def test_get_unique_values_handles_exception(self):
+        """get_unique_values trata exceções."""
+        loader = DataLoader()
+        with patch.object(loader, 'get_connection_context') as mock_ctx:
+            mock_ctx.side_effect = Exception("Erro de conexão")
+            result = loader.get_unique_values('Year')
+            assert result == []
+    
+    def test_get_year_season_map_handles_exception(self):
+        """get_year_season_map trata exceções."""
+        loader = DataLoader()
+        with patch.object(loader, 'get_connection_context') as mock_ctx:
+            mock_ctx.side_effect = Exception("Erro de conexão")
+            result = loader.get_year_season_map()
+            assert result == {}
+    
+    def test_get_noc_map_handles_exception(self):
+        """get_noc_map trata exceções."""
+        loader = DataLoader()
+        with patch.object(loader, 'get_connection_context') as mock_ctx:
+            mock_ctx.side_effect = Exception("Erro de conexão")
+            result = loader.get_noc_map()
+            assert result == {}
+
+
+class TestDBPath:
+    """Testes para caminho do banco de dados."""
+    
+    def test_db_path_is_constructed(self):
+        """DB_PATH é construído corretamente."""
+        assert 'olympics.db' in DB_PATH
+        assert 'data' in DB_PATH

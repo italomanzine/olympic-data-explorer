@@ -11,16 +11,16 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/FastAPI-0.109+-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js"/>
+  <img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js"/>
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React"/>
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="TailwindCSS"/>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Backend_Coverage-100%25-brightgreen?style=flat-square" alt="Backend Coverage"/>
-  <img src="https://img.shields.io/badge/Frontend_Coverage-98.88%25-brightgreen?style=flat-square" alt="Frontend Coverage"/>
-  <img src="https://img.shields.io/badge/Tests-398_passing-success?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Backend_Coverage-99%25-brightgreen?style=flat-square" alt="Backend Coverage"/>
+  <img src="https://img.shields.io/badge/Frontend_Coverage-98.81%25-brightgreen?style=flat-square" alt="Frontend Coverage"/>
+  <img src="https://img.shields.io/badge/Tests-489_passing-success?style=flat-square" alt="Tests"/>
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"/>
 </p>
 
@@ -122,6 +122,12 @@ Este projeto utiliza o dataset público do Kaggle:
 - Gráfico de barras horizontais interativo
 - Links para perfil detalhado do atleta
 
+### 📊 Distribuição por Gênero
+- Gráfico de pizza interativo (donut chart)
+- Visualização da proporção de atletas masculinos/femininos
+- Cores olímpicas (azul para masculino, vermelho para feminino)
+- Tooltips detalhados com contagem e percentual
+
 ### 👤 Perfil do Atleta
 - Busca por nome com autocomplete
 - Card detalhado com foto, biometria e estatísticas
@@ -157,12 +163,12 @@ Este projeto utiliza o dataset público do Kaggle:
 |---------|-------|
 | **Linhas de Código (Backend)** | ~2.200 |
 | **Linhas de Código (Frontend)** | ~8.600 |
-| **Total de Arquivos** | 45+ |
-| **Cobertura de Testes (Backend)** | 100% |
-| **Cobertura de Testes (Frontend)** | 98.88% |
-| **Total de Testes** | 398 |
-| **Endpoints da API** | 10 |
-| **Componentes React** | 15+ |
+| **Total de Arquivos** | 50+ |
+| **Cobertura de Testes (Backend)** | 99% |
+| **Cobertura de Testes (Frontend)** | 98.81% |
+| **Total de Testes** | 489 |
+| **Endpoints da API** | 12 |
+| **Componentes React** | 16+ |
 | **Idiomas Suportados** | 5 |
 
 ---
@@ -186,16 +192,16 @@ Este projeto utiliza o dataset público do Kaggle:
 
 | Tecnologia | Versão | Uso |
 |------------|--------|-----|
-| **Next.js** | 16.0 | Framework React |
-| **React** | 19.2 | Biblioteca UI |
+| **Next.js** | 15.1.9 | Framework React |
+| **React** | 19.0.0 | Biblioteca UI |
 | **TypeScript** | 5 | Tipagem estática |
 | **Tailwind CSS** | 4 | Estilização |
-| **Recharts** | 3.4 | Gráficos |
+| **Recharts** | 3.4.1 | Gráficos |
 | **React Simple Maps** | 3.0 | Mapas geográficos |
 | **D3.js** | 3.1 (d3-geo) | Projeções geográficas |
-| **Framer Motion** | 12.23 | Animações |
+| **Framer Motion** | 12.23.24 | Animações |
 | **Lucide React** | 0.554 | Ícones |
-| **Jest** | 30.2 | Framework de testes |
+| **Jest** | 30.2.0 | Framework de testes |
 | **Testing Library** | 16.3 | Testes de componentes |
 
 ---
@@ -228,8 +234,7 @@ graph TB
     end
     
     subgraph datalayer["Data Layer"]
-        CSV[("athlete_events.csv")]
-        Memory[("In-Memory DataFrame")]
+        SQLite[("olympics.db")]
     end
     
     Browser --> NextApp
@@ -243,15 +248,13 @@ graph TB
     FastAPI --> Router
     Router --> Filters
     Filters --> DataLoader
-    DataLoader --> Memory
-    CSV -->|"Load on Startup"| Memory
+    DataLoader --> SQLite
     
     style Browser fill:#e1f5fe
     style Mobile fill:#e1f5fe
     style NextApp fill:#0070f3,color:#fff
     style FastAPI fill:#009688,color:#fff
-    style CSV fill:#ff9800,color:#fff
-    style Memory fill:#4caf50,color:#fff
+    style SQLite fill:#4caf50,color:#fff
 ```
 
 ### Diagrama C4 - Contexto
@@ -293,21 +296,21 @@ flowchart TB
     end
     
     subgraph data["Data Layer"]
-        csv[("CSV Dataset")]
+        sqlite[("SQLite Database")]
     end
     
     user -->|"HTTPS"| nextjs
     nextjs --> static
     nextjs -->|"REST API"| api
     api --> dataloader
-    dataloader --> csv
+    dataloader --> sqlite
     
     style user fill:#08427b,color:#fff
     style nextjs fill:#0070f3,color:#fff
     style static fill:#0070f3,color:#fff
     style api fill:#009688,color:#fff
     style dataloader fill:#009688,color:#fff
-    style csv fill:#ff9800,color:#fff
+    style sqlite fill:#4caf50,color:#fff
 ```
 
 ### Diagrama C4 - Componentes (Frontend)
@@ -317,23 +320,23 @@ flowchart TB
     subgraph frontend["Next.js Application"]
         page["page.tsx"]
         dashboard["Dashboard.tsx"]
-        
-        subgraph charts["Charts"]
-            worldmap["WorldMap"]
-            evolution["EvolutionChart"]
-            biometrics["BiometricsChart"]
-            topathletes["TopAthletesChart"]
-        end
-        
-        subgraph ui["UI Components"]
-            search["AthleteSearch"]
-            profile["AthleteProfileCard"]
-            filters["SearchableSelect"]
-            slider["RangeSlider"]
-        end
-        
         context["LanguageContext"]
         apiclient["API Client"]
+    end
+    
+    subgraph charts["Charts"]
+        worldmap["WorldMap"]
+        evolution["EvolutionChart"]
+        biometrics["BiometricsChart"]
+        topathletes["TopAthletesChart"]
+        genderpie["GenderPieChart"]
+    end
+    
+    subgraph ui["UI Components"]
+        search["AthleteSearch"]
+        profile["AthleteProfileCard"]
+        filters["SearchableSelect"]
+        slider["RangeSlider"]
     end
     
     page --> dashboard
@@ -341,6 +344,7 @@ flowchart TB
     dashboard --> evolution
     dashboard --> biometrics
     dashboard --> topathletes
+    dashboard --> genderpie
     dashboard --> search
     dashboard --> filters
     dashboard --> context
@@ -365,30 +369,31 @@ flowchart TB
         main["main.py"]
         router["api.py"]
         loader["data_loader.py"]
-        
-        subgraph endpoints["Endpoints"]
-            filters_ep["/filters"]
-            map_ep["/stats/map"]
-            bio_ep["/stats/biometrics"]
-            evo_ep["/stats/evolution"]
-            medals_ep["/stats/medals"]
-            top_ep["/stats/top-athletes"]
-            search_ep["/athletes/search"]
-            profile_ep["/athletes/id"]
-        end
     end
     
-    df[("Pandas DataFrame")]
+    subgraph endpoints["API Endpoints"]
+        filters_ep["GET /filters"]
+        map_ep["GET /stats/map"]
+        gender_ep["GET /stats/gender"]
+        bio_ep["GET /stats/biometrics"]
+        evo_ep["GET /stats/evolution"]
+        medals_ep["GET /stats/medals"]
+        top_ep["GET /stats/top-athletes"]
+        search_ep["GET /athletes/search"]
+        profile_ep["GET /athletes/id"]
+    end
+    
+    sqlite[("SQLite Database")]
     
     main --> router
     router --> endpoints
     endpoints --> loader
-    loader --> df
+    loader --> sqlite
     
     style main fill:#009688,color:#fff
     style router fill:#009688,color:#fff
     style loader fill:#009688,color:#fff
-    style df fill:#4caf50,color:#fff
+    style sqlite fill:#4caf50,color:#fff
 ```
 
 ### Fluxograma de Uso
@@ -471,7 +476,7 @@ Baixe o dataset do Kaggle e coloque em `backend/data/`:
 2. Baixe `athlete_events.csv`
 3. Coloque em `backend/data/athlete_events.csv`
 
-> **Nota:** Se o arquivo não for encontrado, o sistema gerará dados simulados automaticamente.
+> **Nota:** Após baixar o CSV, execute `python scripts/convert_to_sqlite.py` na pasta backend para gerar o banco SQLite `olympics.db`.
 
 ---
 
@@ -574,26 +579,26 @@ O projeto possui uma suíte completa de testes automatizados com alta cobertura 
 | Arquivo | Statements | Coverage |
 |---------|------------|----------|
 | `app/__init__.py` | 0 | 100% |
-| `app/api.py` | 202 | 100% |
-| `app/data_loader.py` | 50 | 100% |
-| `app/main.py` | 11 | 100% |
-| **Total** | **263** | **100%** ✅ |
+| `app/api.py` | 346 | 99% |
+| `app/data_loader.py` | 81 | 100% |
+| `app/main.py` | 12 | 100% |
+| **Total** | **439** | **99%** ✅ |
 
-**Total de testes backend: 107**
+**Total de testes backend: 162**
 
 #### Frontend (TypeScript/React)
 
 | Categoria | Statements | Branches | Functions | Lines |
 |-----------|------------|----------|-----------|-------|
 | `app/` | 100% | 100% | 100% | 100% |
-| `components/` | 96.88% | 78.26% | 56.75% | 96.88% |
-| `components/charts/` | 99.26% | 91.75% | 92.30% | 99.26% |
-| `components/ui/` | 100% | 98.87% | 95.83% | 100% |
+| `components/` | 97.11% | 81.32% | 53.84% | 97.11% |
+| `components/charts/` | 99.34% | 90.24% | 94.11% | 99.34% |
+| `components/ui/` | 100% | 99.05% | 96.77% | 100% |
 | `contexts/` | 100% | 100% | 100% | 100% |
-| `lib/` | 100% | 100% | 100% | 100% |
-| **Total** | **98.88%** | **88.31%** | **81.25%** | **98.88%** ✅ |
+| `lib/` | 98.93% | 100% | 93.75% | 98.93% |
+| **Total** | **98.81%** | **89%** | **80.9%** | **98.81%** ✅ |
 
-**Total de testes frontend: 291**
+**Total de testes frontend: 327**
 
 ---
 
@@ -663,12 +668,14 @@ frontend/src/__tests__/
 │   └── charts/
 │       ├── BiometricsChart.test.tsx
 │       ├── EvolutionChart.test.tsx
+│       ├── GenderPieChart.test.tsx
 │       ├── TopAthletesChart.test.tsx
 │       ├── WorldMap.test.tsx
 │       └── tooltips.test.tsx
 │   └── ui/
 │       ├── AthleteSearch.test.tsx
 │       ├── ChartModal.test.tsx
+│       ├── ChartSkeleton.test.tsx
 │       ├── CountryFlag.test.tsx
 │       ├── LanguageSelector.test.tsx
 │       ├── RangeSlider.test.tsx
@@ -691,6 +698,7 @@ frontend/src/__tests__/
 | `GET` | `/health` | Status da API |
 | `GET` | `/api/filters` | Opções de filtros (anos, esportes, países) |
 | `GET` | `/api/stats/map` | Dados para mapa de medalhas |
+| `GET` | `/api/stats/gender` | Distribuição de atletas por gênero |
 | `GET` | `/api/stats/biometrics` | Dados de altura/peso dos atletas |
 | `GET` | `/api/stats/evolution` | Evolução temporal de medalhas |
 | `GET` | `/api/stats/medals` | Quadro de medalhas |
@@ -729,7 +737,8 @@ olympic-data-explorer/
 │   │   ├── 📄 api.py        # Rotas da API
 │   │   └── 📄 data_loader.py # Carregamento de dados
 │   ├── 📁 data/
-│   │   └── 📄 athlete_events.csv  # Dataset
+│   │   ├── 📄 athlete_events.csv  # Dataset original
+│   │   └── 📄 olympics.db         # Banco SQLite (gerado)
 │   ├── 📁 tests/            # Testes do backend
 │   └── 📄 requirements.txt  # Dependências Python
 │

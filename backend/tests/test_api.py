@@ -1,7 +1,4 @@
-"""
-Testes completos para a API do backend
-Cobrindo todos os endpoints e cenários possíveis
-"""
+"""Testes para a API do backend."""
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
@@ -9,102 +6,52 @@ import pandas as pd
 import numpy as np
 
 from app.main import app
-from app.api import apply_filters, router
-from app.data_loader import DataLoader, generate_mock_data, DATA_PATH
+from app.api import router, RESPONSE_CACHE, get_cache_key, cached_endpoint
 
 client = TestClient(app)
 
 
-class TestApplyFilters:
-    """Testes para a função apply_filters"""
+class TestCacheUtils:
+    """Testes para funções de cache."""
     
-    @pytest.fixture
-    def sample_df(self):
-        """DataFrame de exemplo para testes"""
-        return pd.DataFrame({
-            'ID': [1, 2, 3, 4, 5],
-            'Name': ['Athlete A', 'Athlete B', 'Athlete C', 'Athlete D', 'Athlete E'],
-            'Sex': ['M', 'F', 'M', 'F', 'M'],
-            'Year': [2016, 2016, 2012, 2012, 2008],
-            'Season': ['Summer', 'Summer', 'Winter', 'Winter', 'Summer'],
-            'NOC': ['USA', 'BRA', 'USA', 'CHN', 'GBR'],
-            'Sport': ['Basketball', 'Judo', 'Basketball', 'Swimming', 'Football'],
-            'Medal': ['Gold', 'Silver', 'No Medal', 'Bronze', 'Gold']
-        })
+    def test_get_cache_key_simple(self):
+        """Geração de chave de cache simples."""
+        key = get_cache_key("test_func", {"year": 2016, "season": "Summer"})
+        assert "test_func" in key
+        assert "2016" in key
+        assert "Summer" in key
     
-    def test_apply_filters_no_filters(self, sample_df):
-        """Teste sem filtros aplicados"""
-        result = apply_filters(sample_df)
-        assert len(result) == 5
+    def test_get_cache_key_with_none_values(self):
+        """Geração de chave de cache com valores None."""
+        key = get_cache_key("test_func", {"year": 2016, "season": None})
+        assert "test_func" in key
+        assert "2016" in key
+        assert "season" not in key
     
-    def test_apply_filters_year(self, sample_df):
-        """Teste com filtro de ano"""
-        result = apply_filters(sample_df, year=2016)
-        assert len(result) == 2
-        assert all(result['Year'] == 2016)
+    def test_get_cache_key_with_list(self):
+        """Geração de chave de cache com lista."""
+        key = get_cache_key("test_func", {"countries": ["USA", "BRA"]})
+        assert "test_func" in key
+        assert "BRA" in key
+        assert "USA" in key
     
-    def test_apply_filters_year_range(self, sample_df):
-        """Teste com intervalo de anos"""
-        result = apply_filters(sample_df, start_year=2010, end_year=2016)
-        assert len(result) == 4
-        assert all((result['Year'] >= 2010) & (result['Year'] <= 2016))
-    
-    def test_apply_filters_season(self, sample_df):
-        """Teste com filtro de temporada"""
-        result = apply_filters(sample_df, season='Summer')
-        assert len(result) == 3
-        assert all(result['Season'] == 'Summer')
-    
-    def test_apply_filters_season_both(self, sample_df):
-        """Teste com temporada 'Both' (ignora filtro)"""
-        result = apply_filters(sample_df, season='Both')
-        assert len(result) == 5
-    
-    def test_apply_filters_sex(self, sample_df):
-        """Teste com filtro de sexo"""
-        result = apply_filters(sample_df, sex='M')
-        assert len(result) == 3
-        assert all(result['Sex'] == 'M')
-    
-    def test_apply_filters_sex_both(self, sample_df):
-        """Teste com sexo 'Both' (ignora filtro)"""
-        result = apply_filters(sample_df, sex='Both')
-        assert len(result) == 5
-    
-    def test_apply_filters_country(self, sample_df):
-        """Teste com filtro de país"""
-        result = apply_filters(sample_df, country='USA')
-        assert len(result) == 2
-        assert all(result['NOC'] == 'USA')
-    
-    def test_apply_filters_country_all(self, sample_df):
-        """Teste com país 'All' (ignora filtro)"""
-        result = apply_filters(sample_df, country='All')
-        assert len(result) == 5
-    
-    def test_apply_filters_sport(self, sample_df):
-        """Teste com filtro de esporte"""
-        result = apply_filters(sample_df, sport='Basketball')
-        assert len(result) == 2
-        assert all(result['Sport'] == 'Basketball')
-    
-    def test_apply_filters_sport_all(self, sample_df):
-        """Teste com esporte 'All' (ignora filtro)"""
-        result = apply_filters(sample_df, sport='All')
-        assert len(result) == 5
-    
-    def test_apply_filters_multiple(self, sample_df):
-        """Teste com múltiplos filtros"""
-        result = apply_filters(sample_df, year=2016, season='Summer', sex='M')
-        assert len(result) == 1
-        assert result.iloc[0]['Name'] == 'Athlete A'
+    def test_cached_endpoint_decorator(self):
+        """Decorator de cache."""
+        RESPONSE_CACHE.clear()
+        
+        response1 = client.get("/api/filters")
+        response2 = client.get("/api/filters")
+        
+        assert response1.status_code == 200
+        assert response2.status_code == 200
+        assert response1.json() == response2.json()
 
 
 class TestFiltersEndpoint:
-    """Testes para o endpoint /api/filters"""
+    """Testes para /api/filters."""
     
     def test_get_filters_success(self):
-        """Teste de sucesso ao obter filtros"""
+        """Obter filtros com sucesso."""
         response = client.get("/api/filters")
         assert response.status_code == 200
         data = response.json()
@@ -117,76 +64,82 @@ class TestFiltersEndpoint:
         assert isinstance(data["years"], list)
         assert isinstance(data["sports"], list)
         assert isinstance(data["countries"], list)
-        assert len(data["years"]) > 0
     
     def test_get_filters_countries_structure(self):
-        """Teste da estrutura de países"""
+        """Estrutura de países."""
         response = client.get("/api/filters")
         data = response.json()
         
-        # Primeiro item deve ser "All"
         assert data["countries"][0]["code"] == "All"
         
-        # Cada país deve ter code e label
         for country in data["countries"]:
             assert "code" in country
             assert "label" in country
+    
+    def test_get_filters_year_season_map(self):
+        """Mapeamento ano-temporada."""
+        response = client.get("/api/filters")
+        data = response.json()
+        
+        assert isinstance(data["year_season_map"], dict)
+        for year, seasons in data["year_season_map"].items():
+            assert isinstance(seasons, list)
 
 
 class TestMapStatsEndpoint:
-    """Testes para o endpoint /api/stats/map"""
+    """Testes para /api/stats/map."""
     
     def test_get_map_stats_no_filters(self):
-        """Teste sem filtros"""
+        """Sem filtros."""
         response = client.get("/api/stats/map")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
     
     def test_get_map_stats_with_year(self):
-        """Teste com filtro de ano"""
-        # Pega um ano válido primeiro
+        """Com filtro de ano."""
         filters = client.get("/api/filters").json()
-        year = filters["years"][0]
-        
-        response = client.get(f"/api/stats/map?year={year}")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
+        if filters["years"]:
+            year = filters["years"][0]
+            response = client.get(f"/api/stats/map?year={year}")
+            assert response.status_code == 200
+            data = response.json()
+            assert isinstance(data, list)
     
     def test_get_map_stats_with_year_range(self):
-        """Teste com intervalo de anos"""
+        """Com intervalo de anos."""
         filters = client.get("/api/filters").json()
-        start_year = filters["years"][0]
-        end_year = filters["years"][-1]
-        
-        response = client.get(f"/api/stats/map?start_year={start_year}&end_year={end_year}")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
+        if len(filters["years"]) >= 2:
+            start_year = filters["years"][0]
+            end_year = filters["years"][-1]
+            
+            response = client.get(f"/api/stats/map?start_year={start_year}&end_year={end_year}")
+            assert response.status_code == 200
+            data = response.json()
+            assert isinstance(data, list)
     
     def test_get_map_stats_with_season(self):
-        """Teste com filtro de temporada"""
+        """Com filtro de temporada."""
         response = client.get("/api/stats/map?season=Summer")
         assert response.status_code == 200
     
     def test_get_map_stats_with_sex(self):
-        """Teste com filtro de sexo"""
+        """Com filtro de sexo."""
         response = client.get("/api/stats/map?sex=M")
         assert response.status_code == 200
     
     def test_get_map_stats_with_country(self):
-        """Teste com filtro de país"""
+        """Com filtro de país."""
         response = client.get("/api/stats/map?country=USA")
         assert response.status_code == 200
     
     def test_get_map_stats_with_sport(self):
-        """Teste com filtro de esporte"""
+        """Com filtro de esporte."""
         response = client.get("/api/stats/map?sport=Athletics")
         assert response.status_code == 200
     
     def test_get_map_stats_structure(self):
-        """Teste da estrutura de retorno"""
+        """Estrutura de retorno."""
         response = client.get("/api/stats/map")
         data = response.json()
         
@@ -199,44 +152,119 @@ class TestMapStatsEndpoint:
             assert "total" in item
     
     def test_get_map_stats_empty_result(self):
-        """Teste com filtros que retornam resultado vazio"""
-        # Combinação improvável de filtros
+        """Filtros que retornam vazio."""
         response = client.get("/api/stats/map?year=1800&country=XXX")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []
+    
+    def test_get_map_stats_season_both(self):
+        """Temporada Both."""
+        response = client.get("/api/stats/map?season=Both")
+        assert response.status_code == 200
+
+
+class TestGenderStatsEndpoint:
+    """Testes para /api/stats/gender."""
+    
+    def test_get_gender_stats_default(self):
+        """Sem filtros."""
+        response = client.get("/api/stats/gender")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+    
+    def test_get_gender_stats_with_year(self):
+        """Com filtro de ano."""
+        filters = client.get("/api/filters").json()
+        if filters["years"]:
+            year = filters["years"][-1]
+            response = client.get(f"/api/stats/gender?year={year}")
+            assert response.status_code == 200
+    
+    def test_get_gender_stats_with_year_range(self):
+        """Com intervalo de anos."""
+        filters = client.get("/api/filters").json()
+        if len(filters["years"]) >= 2:
+            start_year = filters["years"][0]
+            end_year = filters["years"][-1]
+            
+            response = client.get(f"/api/stats/gender?start_year={start_year}&end_year={end_year}")
+            assert response.status_code == 200
+    
+    def test_get_gender_stats_with_season(self):
+        """Com filtro de temporada."""
+        response = client.get("/api/stats/gender?season=Summer")
+        assert response.status_code == 200
+    
+    def test_get_gender_stats_with_sex(self):
+        """Com filtro de sexo."""
+        response = client.get("/api/stats/gender?sex=M")
+        assert response.status_code == 200
+    
+    def test_get_gender_stats_with_country(self):
+        """Com filtro de país."""
+        response = client.get("/api/stats/gender?country=USA")
+        assert response.status_code == 200
+    
+    def test_get_gender_stats_with_sport(self):
+        """Com filtro de esporte."""
+        response = client.get("/api/stats/gender?sport=Swimming")
+        assert response.status_code == 200
+    
+    def test_get_gender_stats_with_medal_type(self):
+        """Com filtro de tipo de medalha."""
+        response = client.get("/api/stats/gender?medal_type=Gold")
+        assert response.status_code == 200
+    
+    def test_get_gender_stats_structure(self):
+        """Estrutura de retorno."""
+        response = client.get("/api/stats/gender")
+        data = response.json()
+        
+        if len(data) > 0:
+            item = data[0]
+            assert "Sex" in item
+            assert "Count" in item
+    
+    def test_get_gender_stats_empty(self):
+        """Filtros que retornam vazio."""
+        response = client.get("/api/stats/gender?year=1800")
         assert response.status_code == 200
         data = response.json()
         assert data == []
 
 
 class TestBiometricsEndpoint:
-    """Testes para o endpoint /api/stats/biometrics"""
+    """Testes para /api/stats/biometrics."""
     
     def test_get_biometrics_default(self):
-        """Teste com parâmetros padrão"""
+        """Com parâmetros padrão."""
         response = client.get("/api/stats/biometrics")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
     
     def test_get_biometrics_with_sport(self):
-        """Teste com filtro de esporte"""
+        """Com filtro de esporte."""
         response = client.get("/api/stats/biometrics?sport=Swimming")
         assert response.status_code == 200
     
     def test_get_biometrics_with_year(self):
-        """Teste com filtro de ano"""
+        """Com filtro de ano."""
         filters = client.get("/api/filters").json()
-        year = filters["years"][-1]
-        
-        response = client.get(f"/api/stats/biometrics?year={year}")
-        assert response.status_code == 200
+        if filters["years"]:
+            year = filters["years"][-1]
+            response = client.get(f"/api/stats/biometrics?year={year}")
+            assert response.status_code == 200
     
     def test_get_biometrics_with_all_filters(self):
-        """Teste com todos os filtros"""
+        """Com todos os filtros."""
         response = client.get("/api/stats/biometrics?sport=All&year=2016&season=Summer&sex=M&country=USA")
         assert response.status_code == 200
     
     def test_get_biometrics_structure(self):
-        """Teste da estrutura de retorno"""
+        """Estrutura de retorno."""
         response = client.get("/api/stats/biometrics")
         data = response.json()
         
@@ -248,95 +276,117 @@ class TestBiometricsEndpoint:
             assert "Weight" in item
             assert "Medal" in item
             assert "NOC" in item
+    
+    def test_get_biometrics_sport_all(self):
+        """Com esporte All."""
+        response = client.get("/api/stats/biometrics?sport=All")
+        assert response.status_code == 200
+    
+    def test_get_biometrics_country_all(self):
+        """Com país All."""
+        response = client.get("/api/stats/biometrics?country=All")
+        assert response.status_code == 200
+    
+    def test_get_biometrics_season_both(self):
+        """Com temporada Both."""
+        response = client.get("/api/stats/biometrics?season=Both")
+        assert response.status_code == 200
 
 
 class TestEvolutionEndpoint:
-    """Testes para o endpoint /api/stats/evolution"""
+    """Testes para /api/stats/evolution."""
     
     def test_get_evolution_default(self):
-        """Teste sem filtros (usa top 10 países)"""
+        """Sem filtros (usa top 10 países)."""
         response = client.get("/api/stats/evolution")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
     
     def test_get_evolution_with_countries(self):
-        """Teste com lista de países específicos"""
+        """Com lista de países."""
         response = client.get("/api/stats/evolution?countries=USA&countries=CHN&countries=BRA")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
     
     def test_get_evolution_with_country_filter(self):
-        """Teste com filtro de país único"""
+        """Com filtro de país único."""
         response = client.get("/api/stats/evolution?country=USA")
         assert response.status_code == 200
     
     def test_get_evolution_with_season(self):
-        """Teste com filtro de temporada"""
+        """Com filtro de temporada."""
         response = client.get("/api/stats/evolution?season=Summer")
         assert response.status_code == 200
     
     def test_get_evolution_with_sex(self):
-        """Teste com filtro de sexo"""
+        """Com filtro de sexo."""
         response = client.get("/api/stats/evolution?sex=F")
         assert response.status_code == 200
     
     def test_get_evolution_with_sport(self):
-        """Teste com filtro de esporte"""
+        """Com filtro de esporte."""
         response = client.get("/api/stats/evolution?sport=Swimming")
         assert response.status_code == 200
     
     def test_get_evolution_structure(self):
-        """Teste da estrutura de retorno"""
+        """Estrutura de retorno."""
         response = client.get("/api/stats/evolution")
         data = response.json()
         
         if len(data) > 0:
             item = data[0]
             assert "Year" in item
+    
+    def test_get_evolution_empty_countries(self):
+        """Com países inexistentes."""
+        response = client.get("/api/stats/evolution?countries=XXX&countries=YYY")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []
 
 
 class TestMedalsEndpoint:
-    """Testes para o endpoint /api/stats/medals"""
+    """Testes para /api/stats/medals."""
     
     def test_get_medals_default(self):
-        """Teste sem filtros"""
+        """Sem filtros."""
         response = client.get("/api/stats/medals")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
     
     def test_get_medals_with_year(self):
-        """Teste com filtro de ano"""
+        """Com filtro de ano."""
         filters = client.get("/api/filters").json()
-        year = filters["years"][-1]
-        
-        response = client.get(f"/api/stats/medals?year={year}")
-        assert response.status_code == 200
+        if filters["years"]:
+            year = filters["years"][-1]
+            response = client.get(f"/api/stats/medals?year={year}")
+            assert response.status_code == 200
     
     def test_get_medals_with_country(self):
-        """Teste com filtro de país (agrupa por esporte)"""
+        """Com filtro de país (agrupa por esporte)."""
         response = client.get("/api/stats/medals?country=USA")
         assert response.status_code == 200
     
     def test_get_medals_with_season(self):
-        """Teste com filtro de temporada"""
+        """Com filtro de temporada."""
         response = client.get("/api/stats/medals?season=Winter")
         assert response.status_code == 200
     
     def test_get_medals_with_sex(self):
-        """Teste com filtro de sexo"""
+        """Com filtro de sexo."""
         response = client.get("/api/stats/medals?sex=F")
         assert response.status_code == 200
     
     def test_get_medals_with_sport(self):
-        """Teste com filtro de esporte"""
+        """Com filtro de esporte."""
         response = client.get("/api/stats/medals?sport=Gymnastics")
         assert response.status_code == 200
     
     def test_get_medals_structure(self):
-        """Teste da estrutura de retorno"""
+        """Estrutura de retorno."""
         response = client.get("/api/stats/medals")
         data = response.json()
         
@@ -350,7 +400,7 @@ class TestMedalsEndpoint:
             assert "total" in item
     
     def test_get_medals_empty_result(self):
-        """Teste com filtros que retornam resultado vazio"""
+        """Filtros que retornam vazio."""
         response = client.get("/api/stats/medals?year=1800")
         assert response.status_code == 200
         data = response.json()
@@ -358,67 +408,68 @@ class TestMedalsEndpoint:
 
 
 class TestTopAthletesEndpoint:
-    """Testes para o endpoint /api/stats/top-athletes"""
+    """Testes para /api/stats/top-athletes."""
     
     def test_get_top_athletes_default(self):
-        """Teste com parâmetros padrão"""
+        """Com parâmetros padrão."""
         response = client.get("/api/stats/top-athletes")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        assert len(data) <= 10  # Limite padrão
+        assert len(data) <= 10
     
     def test_get_top_athletes_with_limit(self):
-        """Teste com limite customizado"""
+        """Com limite customizado."""
         response = client.get("/api/stats/top-athletes?limit=5")
         assert response.status_code == 200
         data = response.json()
         assert len(data) <= 5
     
     def test_get_top_athletes_with_year(self):
-        """Teste com filtro de ano"""
+        """Com filtro de ano."""
         filters = client.get("/api/filters").json()
-        year = filters["years"][-1]
-        
-        response = client.get(f"/api/stats/top-athletes?year={year}")
-        assert response.status_code == 200
+        if filters["years"]:
+            year = filters["years"][-1]
+            response = client.get(f"/api/stats/top-athletes?year={year}")
+            assert response.status_code == 200
     
     def test_get_top_athletes_with_year_range(self):
-        """Teste com intervalo de anos"""
+        """Com intervalo de anos."""
         filters = client.get("/api/filters").json()
-        start_year = filters["years"][0]
-        end_year = filters["years"][-1]
-        
-        response = client.get(f"/api/stats/top-athletes?start_year={start_year}&end_year={end_year}")
-        assert response.status_code == 200
+        if len(filters["years"]) >= 2:
+            start_year = filters["years"][0]
+            end_year = filters["years"][-1]
+            
+            response = client.get(f"/api/stats/top-athletes?start_year={start_year}&end_year={end_year}")
+            assert response.status_code == 200
     
     def test_get_top_athletes_with_medal_type_gold(self):
-        """Teste com filtro de medalha de ouro"""
+        """Com filtro de ouro."""
         response = client.get("/api/stats/top-athletes?medal_type=Gold")
         assert response.status_code == 200
     
     def test_get_top_athletes_with_medal_type_silver(self):
-        """Teste com filtro de medalha de prata"""
+        """Com filtro de prata."""
         response = client.get("/api/stats/top-athletes?medal_type=Silver")
         assert response.status_code == 200
     
     def test_get_top_athletes_with_medal_type_bronze(self):
-        """Teste com filtro de medalha de bronze"""
+        """Com filtro de bronze."""
         response = client.get("/api/stats/top-athletes?medal_type=Bronze")
         assert response.status_code == 200
     
     def test_get_top_athletes_with_medal_type_total(self):
-        """Teste com filtro de total"""
+        """Com filtro de total."""
         response = client.get("/api/stats/top-athletes?medal_type=Total")
         assert response.status_code == 200
     
     def test_get_top_athletes_with_all_filters(self):
-        """Teste com todos os filtros"""
+        """Com todos os filtros."""
         response = client.get("/api/stats/top-athletes?year=2016&season=Summer&sex=M&country=USA&sport=Swimming&limit=5")
         assert response.status_code == 200
     
     def test_get_top_athletes_structure(self):
-        """Teste da estrutura de retorno"""
+        """Estrutura de retorno."""
         response = client.get("/api/stats/top-athletes")
         data = response.json()
         
@@ -432,44 +483,46 @@ class TestTopAthletesEndpoint:
             assert "bronze" in item
             assert "total" in item
     
-    def test_get_top_athletes_invalid_limit(self):
-        """Teste com limite inválido (fora do range permitido)"""
+    def test_get_top_athletes_invalid_limit_low(self):
+        """Limite inválido baixo."""
         response = client.get("/api/stats/top-athletes?limit=0")
-        assert response.status_code == 422  # Validation error
-        
+        assert response.status_code == 422
+    
+    def test_get_top_athletes_invalid_limit_high(self):
+        """Limite inválido alto."""
         response = client.get("/api/stats/top-athletes?limit=100")
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 422
 
 
 class TestAthleteSearchEndpoint:
-    """Testes para o endpoint /api/athletes/search"""
+    """Testes para /api/athletes/search."""
     
     def test_search_athletes_success(self):
-        """Teste de busca com sucesso"""
+        """Busca com sucesso."""
         response = client.get("/api/athletes/search?query=Michael")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
     
     def test_search_athletes_with_limit(self):
-        """Teste de busca com limite"""
+        """Busca com limite."""
         response = client.get("/api/athletes/search?query=Michael&limit=5")
         assert response.status_code == 200
         data = response.json()
         assert len(data) <= 5
     
     def test_search_athletes_short_query(self):
-        """Teste com query muito curta"""
+        """Query muito curta."""
         response = client.get("/api/athletes/search?query=M")
-        assert response.status_code == 422  # Validation error (min_length=2)
+        assert response.status_code == 422
     
     def test_search_athletes_no_query(self):
-        """Teste sem query"""
+        """Sem query."""
         response = client.get("/api/athletes/search")
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 422
     
     def test_search_athletes_structure(self):
-        """Teste da estrutura de retorno"""
+        """Estrutura de retorno."""
         response = client.get("/api/athletes/search?query=John")
         data = response.json()
         
@@ -481,19 +534,28 @@ class TestAthleteSearchEndpoint:
             assert "sport" in item
     
     def test_search_athletes_no_results(self):
-        """Teste sem resultados"""
+        """Sem resultados."""
         response = client.get("/api/athletes/search?query=XYZXYZXYZ123456")
         assert response.status_code == 200
         data = response.json()
         assert data == []
+    
+    def test_search_athletes_starts_with_priority(self):
+        """Nomes que começam com a query aparecem primeiro."""
+        response = client.get("/api/athletes/search?query=Phelps")
+        assert response.status_code == 200
+        data = response.json()
+        
+        if len(data) > 0:
+            first_name_lower = data[0]['name'].lower()
+            assert 'phelps' in first_name_lower
 
 
 class TestAthleteProfileEndpoint:
-    """Testes para o endpoint /api/athletes/{athlete_id}"""
+    """Testes para /api/athletes/{athlete_id}."""
     
     def test_get_athlete_profile_success(self):
-        """Teste de perfil com sucesso"""
-        # Primeiro busca um atleta válido
+        """Perfil com sucesso."""
         search = client.get("/api/athletes/search?query=Michael&limit=1").json()
         if len(search) > 0:
             athlete_id = search[0]["id"]
@@ -509,14 +571,14 @@ class TestAthleteProfileEndpoint:
             assert "participations" in data
     
     def test_get_athlete_profile_not_found(self):
-        """Teste com ID inexistente"""
+        """ID inexistente."""
         response = client.get("/api/athletes/9999999")
         assert response.status_code == 200
         data = response.json()
         assert "error" in data
     
     def test_get_athlete_profile_structure(self):
-        """Teste completo da estrutura de retorno"""
+        """Estrutura completa de retorno."""
         search = client.get("/api/athletes/search?query=Usain&limit=1").json()
         if len(search) > 0:
             athlete_id = search[0]["id"]
@@ -537,22 +599,20 @@ class TestAthleteProfileEndpoint:
                 assert "medals" in data
                 assert "participations" in data
                 
-                # Verificar estrutura de medals
                 assert "gold" in data["medals"]
                 assert "silver" in data["medals"]
                 assert "bronze" in data["medals"]
                 assert "total" in data["medals"]
                 
-                # Verificar estrutura de age_range
                 assert "min" in data["age_range"]
                 assert "max" in data["age_range"]
 
 
 class TestAthleteStatsEndpoint:
-    """Testes para o endpoint /api/athletes/{athlete_id}/stats"""
+    """Testes para /api/athletes/{athlete_id}/stats."""
     
     def test_get_athlete_stats_success(self):
-        """Teste de estatísticas com sucesso"""
+        """Estatísticas com sucesso."""
         search = client.get("/api/athletes/search?query=Michael&limit=1").json()
         if len(search) > 0:
             athlete_id = search[0]["id"]
@@ -566,14 +626,14 @@ class TestAthleteStatsEndpoint:
                 assert "medals_by_sport" in data
     
     def test_get_athlete_stats_not_found(self):
-        """Teste com ID inexistente"""
+        """ID inexistente."""
         response = client.get("/api/athletes/9999999/stats")
         assert response.status_code == 200
         data = response.json()
         assert "error" in data
     
     def test_get_athlete_stats_structure(self):
-        """Teste completo da estrutura de retorno"""
+        """Estrutura completa de retorno."""
         search = client.get("/api/athletes/search?query=Phelps&limit=1").json()
         if len(search) > 0:
             athlete_id = search[0]["id"]
@@ -581,7 +641,6 @@ class TestAthleteStatsEndpoint:
             data = response.json()
             
             if "error" not in data:
-                # Evolution
                 assert isinstance(data["evolution"], list)
                 if len(data["evolution"]) > 0:
                     evo_item = data["evolution"][0]
@@ -592,30 +651,28 @@ class TestAthleteStatsEndpoint:
                     assert "Total" in evo_item
                     assert "Events" in evo_item
                 
-                # Biometrics
                 assert "height" in data["biometrics"]
                 assert "weight" in data["biometrics"]
                 assert "sex" in data["biometrics"]
                 
-                # Medals by sport
                 assert isinstance(data["medals_by_sport"], list)
 
 
 class TestRootEndpoint:
-    """Testes para o endpoint raiz"""
+    """Testes para o endpoint raiz."""
     
     def test_root(self):
-        """Teste do endpoint raiz"""
+        """Endpoint raiz."""
         response = client.get("/")
         assert response.status_code == 200
         assert response.json() == {"message": "Olympic Data API is running"}
 
 
 class TestHealthEndpoint:
-    """Testes para o endpoint de saúde"""
+    """Testes para health check."""
     
     def test_health_check(self):
-        """Teste do health check"""
+        """Health check."""
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}

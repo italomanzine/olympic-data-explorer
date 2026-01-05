@@ -47,7 +47,6 @@ const getMedalRank = (medal: string): number => {
   return medalOrder[medal] || 0;
 };
 
-// Exported for testing
 export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
 
@@ -208,25 +207,32 @@ function BiometricsChart({ data }: BiometricsChartProps) {
             range={[60, 400]}
             name="Qtd"
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend verticalAlign="top" height={36} />
+          <Tooltip 
+            cursor={{ strokeDasharray: '3 3' }}
+            content={<CustomTooltip />} 
+            isAnimationActive={false}
+          />
+          <Legend 
+            verticalAlign="top" 
+            height={36}
+          />
           <Scatter
+            key="female-scatter"
             name={t("female")}
             data={groupedData.F}
             fill="#EE334E"
             fillOpacity={0.6}
             shape="circle"
-            animationDuration={400}
-            animationEasing="ease-out"
+            isAnimationActive={false}
           />
           <Scatter
+            key="male-scatter"
             name={t("male")}
             data={groupedData.M}
             fill="#0081C8"
             fillOpacity={0.6}
             shape="triangle"
-            animationDuration={400}
-            animationEasing="ease-out"
+            isAnimationActive={false}
           />
         </ScatterChart>
       </ResponsiveContainer>
