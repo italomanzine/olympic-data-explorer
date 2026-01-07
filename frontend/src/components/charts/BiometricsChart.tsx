@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, memo } from "react";
+import React, { useMemo, memo, useCallback } from "react";
 import {
   ScatterChart,
   Scatter,
@@ -9,8 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  ZAxis,
+  Cell,
 } from "recharts";
 import { useLanguage } from "../../contexts/LanguageContext";
 
@@ -30,10 +29,12 @@ interface BiometricsChartProps {
 
 interface GroupedBiometricData {
   uniqueKey: string;
-  Sex: string;
   Height: number;
   Weight: number;
   Athletes: BiometricData[];
+  maleCount: number;
+  femaleCount: number;
+  dominantSex: "M" | "F" | "mixed";
 }
 
 const getMedalRank = (medal: string): number => {
@@ -47,40 +48,60 @@ const getMedalRank = (medal: string): number => {
   return medalOrder[medal] || 0;
 };
 
+// Cores para os diferentes casos
+const COLORS = {
+  male: "#0081C8",      // Azul olímpico
+  female: "#EE334E",    // Rosa olímpico
+  mixed: "#9333EA",     // Roxo para indicar ambos os sexos
+};
+
 export const CustomTooltip = memo(({ active, payload }: any) => {
   const { t, tCountry } = useLanguage();
 
   if (active && payload && payload.length) {
     const data: GroupedBiometricData = payload[0].payload;
 
+    // Validação extra: verificar se os dados existem
+    if (!data || !data.Athletes || !Array.isArray(data.Athletes)) {
+      return null;
+    }
+
     const sortedAthletes = [...data.Athletes].sort((a, b) => {
-      return getMedalRank(b.Medal) - getMedalRank(a.Medal);
+      // Ordenar por medalha primeiro, depois por sexo
+      const medalDiff = getMedalRank(b.Medal) - getMedalRank(a.Medal);
+      if (medalDiff !== 0) return medalDiff;
+      return a.Sex.localeCompare(b.Sex);
     });
 
     const displayAthletes = sortedAthletes.slice(0, 10);
     const remaining = sortedAthletes.length - 10;
 
     return (
-      <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-lg text-sm z-50 max-w-[250px]">
+      <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-lg text-sm z-50 max-w-[280px]">
         <div className="mb-2 border-b border-slate-100 pb-1">
           <p className="font-bold text-slate-800">
             {data.Height}cm, {data.Weight}kg
           </p>
           <p className="text-xs text-slate-500">
             {data.Athletes.length} {t("athletes_here")}
+            {data.maleCount > 0 && data.femaleCount > 0 && (
+              <span className="ml-1">
+                ({data.femaleCount} {t("female")}, {data.maleCount} {t("male")})
+              </span>
+            )}
           </p>
         </div>
 
         <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
           {displayAthletes.map((atleta, idx) => (
             <div
-              key={idx}
+              key={`${atleta.Name}-${idx}`}
               className="text-xs border-b border-slate-50 last:border-0 pb-1 last:pb-0"
             >
               <p className="font-semibold text-slate-700">
                 {atleta.Name} ({tCountry(atleta.NOC) || atleta.NOC})
               </p>
-              <p className="text-slate-500 inline-block mr-2">
+              <p className={`inline-block mr-2 font-medium ${atleta.Sex === "M" ? "text-blue-600" : "text-pink-600"}`}>
                 {atleta.Sex === "M" ? t("male") : t("female")}
               </p>
               {atleta.Medal !== "NA" && atleta.Medal !== "No Medal" && (
@@ -113,51 +134,160 @@ export const CustomTooltip = memo(({ active, payload }: any) => {
 
 CustomTooltip.displayName = 'CustomTooltip';
 
+// Forma customizada SVG usando render prop
+const renderCustomShape = (props: any): React.ReactElement => {
+  const { cx, cy, payload } = props;
+  
+  if (cx === undefined || cy === undefined || !payload) {
+    return <g />;
+  }
+  
+  const data = payload as GroupedBiometricData;
+  const size = Math.min(8, 4 + (data.Athletes?.length || 1) * 0.2);
+  
+  if (data.dominantSex === "mixed") {
+    // Círculo dividido ao meio
+    return (
+      <g>
+        <path
+          d={`M ${cx} ${cy - size} A ${size} ${size} 0 0 0 ${cx} ${cy + size} Z`}
+          fill={COLORS.female}
+          fillOpacity={0.8}
+        />
+        <path
+          d={`M ${cx} ${cy - size} A ${size} ${size} 0 0 1 ${cx} ${cy + size} Z`}
+          fill={COLORS.male}
+          fillOpacity={0.8}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={size}
+          fill="none"
+          stroke="#666"
+          strokeWidth={0.5}
+        />
+      </g>
+    );
+  } else if (data.dominantSex === "F") {
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={size}
+        fill={COLORS.female}
+        fillOpacity={0.8}
+      />
+    );
+  } else {
+    const h = size * 1.2;
+    const w = size * 0.87;
+    return (
+      <polygon
+        points={`${cx},${cy - h} ${cx - w},${cy + h * 0.5} ${cx + w},${cy + h * 0.5}`}
+        fill={COLORS.male}
+        fillOpacity={0.8}
+      />
+    );
+  }
+};
+
+// Legenda customizada
+const CustomLegend = memo(() => {
+  const { t } = useLanguage();
+  
+  return (
+    <div className="flex justify-center gap-6 mb-2">
+      <div className="flex items-center gap-1.5">
+        <svg width="12" height="12">
+          <circle cx="6" cy="6" r="5" fill={COLORS.female} fillOpacity={0.8} />
+        </svg>
+        <span className="text-sm text-slate-600">{t("female")}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <svg width="12" height="12">
+          <polygon points="6,1 1,11 11,11" fill={COLORS.male} fillOpacity={0.8} />
+        </svg>
+        <span className="text-sm text-slate-600">{t("male")}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <svg width="12" height="12">
+          <path d="M 6 1 A 5 5 0 0 0 6 11 Z" fill={COLORS.female} fillOpacity={0.8} />
+          <path d="M 6 1 A 5 5 0 0 1 6 11 Z" fill={COLORS.male} fillOpacity={0.8} />
+          <circle cx="6" cy="6" r="5" fill="none" stroke="#666" strokeWidth={0.5} />
+        </svg>
+        <span className="text-sm text-slate-600">{t("female")} + {t("male")}</span>
+      </div>
+    </div>
+  );
+});
+
+CustomLegend.displayName = 'CustomLegend';
+
 function BiometricsChart({ data }: BiometricsChartProps) {
   const { t } = useLanguage();
 
   const groupedData = useMemo(() => {
-    if (!data) return { M: [], F: [] };
+    if (!data || data.length === 0) return [];
 
+    // Agrupar por coordenadas (peso + altura)
     const groups: Record<string, {
       uniqueKey: string;
-      Sex: string;
       Height: number;
       Weight: number;
       AthletesMap: Map<string, BiometricData>;
     }> = {};
 
     data.forEach((d) => {
-      const key = `${d.Weight}-${d.Height}-${d.Sex}`;
+      // Ignorar dados inválidos
+      if (!d.Height || !d.Weight || !d.Name) return;
+      
+      const key = `${d.Weight}-${d.Height}`;
       if (!groups[key]) {
         groups[key] = {
           uniqueKey: key,
-          Sex: d.Sex,
           Height: d.Height,
           Weight: d.Weight,
           AthletesMap: new Map(),
         };
       }
       
+      // Usar Name como chave para evitar duplicatas
       const existing = groups[key].AthletesMap.get(d.Name);
       if (!existing || getMedalRank(d.Medal) > getMedalRank(existing.Medal)) {
         groups[key].AthletesMap.set(d.Name, d);
       }
     });
 
-    const allGroups = Object.values(groups).map(g => ({
-      uniqueKey: g.uniqueKey,
-      Sex: g.Sex,
-      Height: g.Height,
-      Weight: g.Weight,
-      Athletes: Array.from(g.AthletesMap.values())
-    }));
+    const allGroups: GroupedBiometricData[] = Object.values(groups).map(g => {
+      const athletes = Array.from(g.AthletesMap.values());
+      const maleCount = athletes.filter(a => a.Sex === "M").length;
+      const femaleCount = athletes.filter(a => a.Sex === "F").length;
+      
+      let dominantSex: "M" | "F" | "mixed";
+      if (maleCount > 0 && femaleCount > 0) {
+        dominantSex = "mixed";
+      } else if (femaleCount > 0) {
+        dominantSex = "F";
+      } else {
+        dominantSex = "M";
+      }
+      
+      return {
+        uniqueKey: g.uniqueKey,
+        Height: g.Height,
+        Weight: g.Weight,
+        Athletes: athletes,
+        maleCount,
+        femaleCount,
+        dominantSex,
+      };
+    });
 
-    return {
-      M: allGroups.filter((g) => g.Sex === "M"),
-      F: allGroups.filter((g) => g.Sex === "F"),
-    };
+    return allGroups;
   }, [data]);
+
+  const renderShape = useCallback(renderCustomShape, []);
 
   if (!data || data.length === 0) {
     return (
@@ -169,8 +299,9 @@ function BiometricsChart({ data }: BiometricsChartProps) {
 
   return (
     <div className="w-full h-full transition-opacity duration-300">
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 20, right: 20, bottom: 50, left: 40 }}>
+      <CustomLegend />
+      <ResponsiveContainer width="100%" height="95%">
+        <ScatterChart margin={{ top: 10, right: 20, bottom: 50, left: 40 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
           <XAxis
             type="number"
@@ -178,6 +309,7 @@ function BiometricsChart({ data }: BiometricsChartProps) {
             name={t("weight")}
             unit="kg"
             stroke="#94A3B8"
+            domain={['dataMin - 5', 'dataMax + 5']}
             label={{
               value: `${t("weight")} (kg)`,
               position: "bottom",
@@ -190,8 +322,8 @@ function BiometricsChart({ data }: BiometricsChartProps) {
             dataKey="Height"
             name={t("height")}
             unit="cm"
-            domain={["30", "auto"]}
             stroke="#94A3B8"
+            domain={['dataMin - 5', 'dataMax + 5']}
             label={{
               value: `${t("height")} (cm)`,
               angle: -90,
@@ -201,37 +333,15 @@ function BiometricsChart({ data }: BiometricsChartProps) {
               offset: -10,
             }}
           />
-          <ZAxis
-            type="number"
-            dataKey="Athletes.length"
-            range={[60, 400]}
-            name="Qtd"
-          />
           <Tooltip 
             cursor={{ strokeDasharray: '3 3' }}
             content={<CustomTooltip />} 
             isAnimationActive={false}
           />
-          <Legend 
-            verticalAlign="top" 
-            height={36}
-          />
           <Scatter
-            key="female-scatter"
-            name={t("female")}
-            data={groupedData.F}
-            fill="#EE334E"
-            fillOpacity={0.6}
-            shape="circle"
-            isAnimationActive={false}
-          />
-          <Scatter
-            key="male-scatter"
-            name={t("male")}
-            data={groupedData.M}
-            fill="#0081C8"
-            fillOpacity={0.6}
-            shape="triangle"
+            name="Athletes"
+            data={groupedData}
+            shape={renderShape}
             isAnimationActive={false}
           />
         </ScatterChart>
